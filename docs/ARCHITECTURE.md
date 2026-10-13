@@ -30,14 +30,15 @@ NexusFlow is a modular multi-agent platform that guides a user from a raw produc
 - Explicit versioning and foreign keys to preserve project history
 
 ### Agent orchestration
-- Strands execution framework orchestrates specialist agents through graph and workflow patterns.
-- Workflow controller tracks stage transitions, status, dependencies, retries, and staleness.
-- Execution metadata stays linked to projects and workflow steps for replay and trace inspection.
+- A Strands-backed Idea Analyst creates a structured idea brief when the Bedrock provider is configured; a mock provider is available for local development.
+- A persisted workflow controller tracks stage transitions and human decisions.
+- Stage deliverables are reviewable Markdown drafts based on saved project inputs. The research stage creates a plan and does not claim to have searched the web.
+- Evaluation reports currently use deterministic rules; they are not model-based evaluations.
 
 ### Tooling model
-- Search, file/document, calc, and GitHub inspection tools behind explicit permission checks
-- Tool metadata is recorded and limited to authorized project scopes
-- External web content is treated as untrusted input
+- A separate MCP Streamable HTTP server exposes read-only, project-scoped tools for project context and artifact inspection.
+- The local MCP server binds to loopback on port 8001. It does not support external search or project mutations.
+- Search, calculation, and GitHub tools remain planned integrations.
 
 ### Observability
 - Structured logging and OpenTelemetry-inspired spans for workflow events, LLM calls, tool calls, and decisions
@@ -72,4 +73,4 @@ IDEA SUBMITTED -> IDEA DISCOVERY -> HUMAN APPROVAL -> RESEARCH -> FEASIBILITY ->
 
 ## Current implementation status
 
-The repository is in the Phase 1 foundation stage. The current milestone includes a health endpoint, config handling, a durable project model, and CRUD routes with tests. The broader multi-agent workflow remains planned and staged for subsequent phases.
+The repository is a local prototype with a FastAPI REST API, Next.js workspace, SQLite development persistence, persisted workflow decisions, stage draft generation, versioned artifacts, deterministic evaluation reports, and a local read-only MCP server. It does not yet include A2A, external research, authentication, production migrations, or a deployed multi-agent orchestration service. See `IMPLEMENTATION_PLAN.md` for the current boundaries and follow-up work.
