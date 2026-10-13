@@ -7,7 +7,8 @@
 
 **A local-first project planning workspace with structured idea analysis, versioned deliverables, explicit human approvals, deterministic quality checks, and a read-only MCP interface.**
 
-[Quick Start](#-quick-start) · [How It Works](#-how-it-works) · [Architecture](#-architecture) · [Roadmap](#-roadmap)
+
+[🚀 Quick Start](#-quick-start) · [🧭 How It Works](#-how-it-works) · [🏗️ Architecture](docs/NexusFlow%20Architecture%20.png) · [🗺️ Roadmap](docs/IMPLEMENTATION_PLAN.md#phase-roadmap)
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white)
