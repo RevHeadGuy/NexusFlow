@@ -1,49 +1,95 @@
 # NexusFlow
 
-NexusFlow is a local-first workspace for turning a software idea into structured, human-reviewable project plans and artifacts. It combines a Next.js frontend, a FastAPI API, saved workflow decisions, and an optional read-only MCP server.
+NexusFlow turns an early software idea into a structured brief, reviewable planning documents, and an exportable project package. It pairs a Next.js workspace with a FastAPI backend, SQLite persistence for local development, optional LLM-backed idea analysis, deterministic review checks, and explicit human approvals.
 
-> **Project status:** early-stage prototype for local development and evaluation. It is not production-hardened and should not be exposed to the public internet.
+> **Status:** local-first prototype for development and evaluation. It has no user authentication or project-level authorization and is not safe to expose to the public internet as-is.
 
-## What you can do
+## Contents
 
-- Create projects and generate a structured idea brief.
-- Move through persisted workflow stages, prepare Markdown drafts, edit them into new versions, and approve or reject each stage.
-- Resume a saved workflow after closing or restarting the local app.
-- Choose a project starter and adapt a reusable workflow template before starting.
-- Record cited research sources, findings, and review status; refresh a versioned research plan from that log.
-- Edit the structured brief and attach resolvable, version-linked review comments to artifacts.
-- Review versioned artifacts, evaluations, trace events, and guardrail findings.
-- Export a project package with the brief, workflow decisions, source log, unresolved review feedback, and full artifact version history.
-- Optionally let an MCP-compatible local client read project context and artifacts.
+- [What NexusFlow does](#what-nexusflow-does)
+- [Current boundaries](#current-boundaries)
+- [Architecture](#architecture)
+- [Requirements](#requirements)
+- [Quick start](#quick-start)
+- [Project workflow](#project-workflow)
+- [LLM providers and token usage](#llm-providers-and-token-usage)
+- [Local MCP server](#local-mcp-server)
+- [Configuration reference](#configuration-reference)
+- [API overview](#api-overview)
+- [Tests and production build](#tests-and-production-build)
+- [Data, security, and troubleshooting](#data-security-and-troubleshooting)
+- [Roadmap and contributing](#roadmap-and-contributing)
 
-The workflow is human-reviewed, but it is **not yet a distributed multi-agent system**. The Idea Analyst supports mock responses, Groq, and Amazon Bedrock; later stage drafts are generated from saved project inputs. Research sources are entered by project participants; NexusFlow does not fetch or independently verify them. Evaluation reports use deterministic rules rather than a model-based evaluator. Reviewer names are labels only because authentication is not implemented. See [the architecture notes](docs/ARCHITECTURE.md) for implementation boundaries.
+## What NexusFlow does
+
+- Create and update software projects, then generate and edit a structured idea brief.
+- Start a persisted workflow using a selected template and stage sequence.
+- Prepare Markdown deliverables, edit them as new versions, and review changes over time.
+- Record explicit approvals, rejections, requests for changes, and revisits.
+- Use a combined review queue for workflow stages and standalone human review checkpoints.
+- Gate workflow approvals on the expected artifact, minimum content, high/critical content findings, unresolved comments, unresolved blocking guardrails, and new artifact versions after revision requests.
+- Record user-curated research sources, findings, notes, and review status; refresh a versioned research plan from that log.
+- Run deterministic consistency and Devil's Advocate evaluations and inspect guardrail findings and agent run records.
+- Export a ZIP package containing the brief, workflow decisions, research source log, review feedback, and artifact version history.
+- Optionally expose read-only project context and artifacts to a local MCP-compatible client.
+
+The interface includes a project dashboard and workspace, brief editor, workflow and decision history, artifacts, research, evaluations, traces, standalone checkpoints, a review queue, and MLOps views for runs, prompts, and metrics.
+
+## Current boundaries
+
+NexusFlow is a **human-reviewed project planning workflow**, not a distributed multi-agent system. The Idea Analyst is the only model-backed agent flow. Workflow stages produce transparent drafts from saved project inputs; they do not represent independent agents collaborating. Research source entry is user-curated; the app does not discover or verify sources. Evaluation reports are rule-based rather than model-based.
+
+Groq and Bedrock are provider options for idea analysis. The development example uses a mock provider so the app can run without cloud credentials. Token counts are recorded when the provider returns them. The cost summary currently estimates Bedrock costs only, so Groq cost is intentionally left blank. Parallel tool calling is not used for idea analysis because that flow makes a single model request and has no independent tool calls to run.
+
+MCP currently provides read-only local access. **A2A is not implemented.** Reviewer names are labels and are not authenticated identities. See [Architecture](docs/ARCHITECTURE.md) and [Implementation Plan](docs/IMPLEMENTATION_PLAN.md) for detail.
+
+## Architecture
+
+```text
+Next.js 16 / React 19 frontend (port 3000)
+        │ HTTP / JSON
+        ▼
+FastAPI backend (port 8000)
+  ├─ REST API routers
+  ├─ services: workflow, artifacts, reviews, research, guardrails, evaluations, MLOps
+  ├─ Idea Analyst: mock / Groq / Amazon Bedrock
+  └─ SQLAlchemy persistence
+        │
+        ▼
+SQLite database (local default: backend/nexusflow.db)
+
+Optional local MCP Streamable HTTP server (127.0.0.1:8001/mcp)
+  └─ read-only project context and artifact tools
+```
+
+The backend is organized into `api/`, `agents/`, `guardrails/`, `models/`, `schemas/`, and `services/`. The frontend is a Next.js App Router application under `frontend/src/app/`, with reusable components under `frontend/src/components/` and typed API clients under `frontend/src/lib/`.
+
+SQLite tables persist projects, briefs, workflow plans and decisions, artifacts and versions, source records, review comments, HITL checkpoints, guardrail findings, evaluations, traces, prompt versions, and agent runs. The application initializes tables on startup; this prototype does not include a production migration workflow.
+
+## Requirements
+
+- Python 3.10 or newer
+- Node.js 20.9 or newer and npm
+- Optional: a Groq API key or AWS credentials for non-mock idea analysis
 
 ## Quick start
 
-### Requirements
+Open two terminals from the repository root.
 
-- Python 3.10 or newer
-- Node.js 20.9 or newer
-- npm
-
-### 1. Start the API
-
-From the repository root:
+### 1. Backend API
 
 ```bash
 cd backend
 cp ../.env.example .env
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+python -m pip install -r requirements.txt
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-The example configuration selects a mock provider that returns a predictable sample brief and does not require cloud credentials. The API creates a local SQLite database at `backend/nexusflow.db`. Check that the API is ready at <http://localhost:8000/health>; interactive API docs are at <http://localhost:8000/docs>.
+The example `.env` selects `LLM_PROVIDER=mock`, so no model credentials are needed. The API creates the SQLite file at `backend/nexusflow.db` when started from `backend/`. Verify it at <http://localhost:8000/health>; interactive API documentation is at <http://localhost:8000/docs>.
 
-### 2. Start the web app
-
-In a second terminal, from the repository root:
+### 2. Frontend
 
 ```bash
 cd frontend
@@ -51,29 +97,42 @@ npm ci
 npm run dev
 ```
 
-Open <http://localhost:3000>. The frontend uses `http://localhost:8000` by default. To point it at a different API, set `NEXT_PUBLIC_API_URL` in `frontend/.env.local` and restart the frontend.
+Open <http://localhost:3000>. The frontend uses `http://localhost:8000` by default. To change this, set `NEXT_PUBLIC_API_URL` in `frontend/.env.local`, then restart the frontend. Only put values safe for browser exposure in `NEXT_PUBLIC_*` variables.
 
-### 3. Try the sample journey
+### 3. Try the project journey
 
-On an empty dashboard, choose **Explore with a sample** to create a saved example project. From there, generate its brief, start the workflow, prepare and review drafts, record decisions, and inspect or export the resulting artifacts. The sample still uses your local API and database; it is not a hosted demo or pre-populated fixture.
+From the dashboard, choose **Explore with a sample** to create a saved example project, or **Start your own** to enter an idea. Generate the brief, start the workflow, prepare the stage draft, review the artifact, and record your decision. Continue through stages and use the Review Queue to see items needing attention. The sample is created in your local database; it is not a hosted demo or preloaded fixture.
 
-To use your own idea instead, choose **Start your own** and create a project.
+## Project workflow
 
-## Optional: local MCP server
+The default full-product stage sequence is:
 
-In a third terminal, with the backend environment active:
+| Stage | Prepared deliverable(s) | What the current implementation does |
+| --- | --- | --- |
+| Idea discovery | Idea Brief | Uses the saved structured brief; generate the brief with idea analysis first. |
+| Market research | Research Plan | Builds a plan from the idea and participant-entered sources. It does not browse the web. |
+| Technical feasibility | Technical Feasibility | Creates a transparent initial planning draft from project inputs. |
+| PRD and architecture | Product Requirements, Architecture Outline | Creates initial Markdown outlines from project inputs and brief. |
+| Quality review | Quality Review | Collects deterministic consistency and Devil's Advocate findings. |
+| Final approval | Final Package Guide | Lists the project's saved artifacts for final human review. |
 
-```bash
-cd backend
-source .venv/bin/activate
-python -m app.mcp_server
-```
+Every stage requires a human decision. The backend prevents approval until the stage deliverables exist and pass the configured review checks. A request for changes requires notes; before a later approval, every required artifact must have a version newer than that request. Preparing an existing stage preserves its current artifact and reviewer edits rather than silently overwriting them.
 
-The Streamable HTTP endpoint is <http://127.0.0.1:8001/mcp>. It binds to loopback and exposes three read-only tools: `get_project_context`, `list_project_artifacts`, and `read_project_artifact`. It cannot change project data, start workflows, or perform external research. **A2A is not implemented.**
+Workflow templates store a stage plan on the project workflow. The frontend offers starter choices and lets users choose a workflow sequence; valid stage keys are `idea_discovery`, `market_research`, `technical_feasibility`, `prd_architecture`, `quality_review`, and `final_approval`.
 
-## Use Groq for idea analysis
+Standalone HITL checkpoints are a separate mechanism alongside workflow stage approvals. Both appear in the combined review experience.
 
-After the Quick start has created `backend/.env`, set these values there:
+## LLM providers and token usage
+
+Provider configuration is read by the backend from its process environment or `backend/.env`.
+
+### Mock (default for local setup)
+
+`LLM_PROVIDER=mock` returns a predictable sample brief and requires no API key. Use this for UI exploration and tests.
+
+### Groq
+
+Set these values in `backend/.env`:
 
 ```dotenv
 LLM_PROVIDER=groq
@@ -81,40 +140,116 @@ GROQ_API_KEY=your_groq_api_key
 GROQ_MODEL=openai/gpt-oss-120b
 ```
 
-Restart the API after changing the provider. The API sends idea analysis to Groq and validates the JSON response against the project brief schema. The selected model supports JSON output; check Groq's [current model list](https://console.groq.com/docs/models) if you choose a different model. Keep the key in the backend environment only. Never add a real key to `frontend/.env.local`, source control, or a public issue.
+Restart the API after changing provider configuration. The backend sends idea analysis to Groq and validates the returned structured data against the brief schema. Check Groq's [current model documentation](https://console.groq.com/docs/models) for available models and capabilities. Keep the key in the backend environment only; never commit it or put it in a frontend environment file.
 
-Groq returns prompt and completion token counts. NexusFlow shows the latest counts beside the generated brief and stores them in **Agent Runs** and **Metrics**. The cost dashboard's estimate is for Bedrock pricing only; Groq usage is counted but its cost is left blank rather than calculated with the wrong provider's rates.
+When returned by the provider, input and output token counts appear with idea analysis and are stored in Agent Runs and Metrics. Idea analysis currently makes one model request and caps completion output at 1,200 tokens. Parallel tool calling does not reduce token use and is not used in this request because there are no independent tool calls.
 
-To use Bedrock instead, set `LLM_PROVIDER=bedrock` and provide AWS credentials, region, and model settings. Use `LLM_PROVIDER=mock` to try the app without an external LLM key.
+### Amazon Bedrock
 
-### Token limits and parallel tool calls
+Set `LLM_PROVIDER=bedrock`, configure `AWS_REGION` and `BEDROCK_MODEL_ID`, and provide AWS credentials through the environment or the AWS credential chain used by boto3. Do not commit access keys. The application fallback provider is Bedrock, but `.env.example` selects mock for a credential-free first run.
 
-The idea analysis request caps the generated completion at 1,200 tokens. Parallel tool calling is not used by this request: it makes one model call and has no independent tools to invoke. Parallel calls can reduce waiting when several independent tools are needed, but they do not by themselves lower token consumption. For this workflow, controlling prompt and completion size is the relevant token limit.
+## Local MCP server
 
-## Configuration
+Start the API first, then open a third terminal:
 
-| Variable | Purpose | Quick-start value / app fallback |
+```bash
+cd backend
+source .venv/bin/activate
+python -m app.mcp_server
+```
+
+The Streamable HTTP endpoint is <http://127.0.0.1:8001/mcp>. It binds to loopback and exposes three read-only tools:
+
+- `get_project_context(project_id)` — project idea, brief, workflow state, and decisions.
+- `list_project_artifacts(project_id)` — artifact names, types, versions, and update times.
+- `read_project_artifact(project_id, artifact_id)` — latest artifact content after checking that the artifact belongs to the supplied project.
+
+These tools cannot edit or delete data, approve workflow stages, create projects, or perform external research. The server is a local development integration; it has no authentication for network exposure. A2A and connections to external MCP servers are not implemented.
+
+## Configuration reference
+
+Backend variables can be set in `backend/.env` or in the backend process environment. See [.env.example](.env.example) for a copyable template.
+
+| Variable | Purpose | Example / fallback |
 | --- | --- | --- |
-| `LLM_PROVIDER` | Idea analysis provider (`mock`, `groq`, or `bedrock`) | `mock` in `.env.example`; app fallback is `bedrock` |
-| `GROQ_API_KEY` | Backend-only Groq credential | Required when `LLM_PROVIDER=groq` |
-| `GROQ_MODEL` | Groq chat completion model | `openai/gpt-oss-120b` |
-| `DATABASE_URL` | SQLAlchemy database connection | `sqlite:///./nexusflow.db` |
-| `AWS_REGION` | Bedrock region | `us-west-2` |
-| `BEDROCK_MODEL_ID` | Bedrock model identifier | Set in `backend/app/config.py` |
-| `CORS_ORIGINS` | Allowed browser origins | `http://localhost:3000` |
-| `NEXT_PUBLIC_API_URL` | API URL used by frontend | `http://localhost:8000` |
+| `APP_NAME` | Application name setting | `NexusFlow` |
+| `APP_ENV` | Environment label | `development` |
+| `DEBUG` | Debug setting | `true` |
+| `BACKEND_HOST` | Configured backend host | `0.0.0.0` in settings; local quick start explicitly binds to `127.0.0.1` |
+| `BACKEND_PORT` | Configured backend port | `8000` |
+| `DATABASE_URL` | SQLAlchemy connection URL | `sqlite:///./nexusflow.db` |
+| `CORS_ORIGINS` | JSON list of permitted browser origins | `["http://localhost:3000"]` |
+| `LLM_PROVIDER` | Idea-analysis provider (`mock`, `groq`, `bedrock`) | app fallback `bedrock`; `.env.example` uses `mock` |
+| `GROQ_API_KEY` | Backend-only Groq credential | empty unless Groq is selected |
+| `GROQ_MODEL` | Groq model identifier | `openai/gpt-oss-120b` |
+| `AWS_REGION` | AWS region for Bedrock | `us-west-2` |
+| `BEDROCK_MODEL_ID` | Bedrock model identifier | `anthropic.claude-3-5-sonnet-20240620-v1:0` |
+| `LLM_TIMEOUT_SECONDS` | Provider request timeout setting | `60` |
+| `NEXT_PUBLIC_API_URL` | Frontend API base URL | `http://localhost:8000` |
 
-Backend settings are read from environment variables or `backend/.env`. Frontend variables must use the `NEXT_PUBLIC_` prefix only when they are safe to expose in the browser.
+`DATABASE_URL` may be pointed at another SQLAlchemy database, but the project only documents and validates SQLite for local use. Other database engines may require a driver, schema migrations, and deployment-specific configuration.
 
-## Architecture and roadmap
+## API overview
+
+The complete request and response schemas are available in Swagger UI at <http://localhost:8000/docs>.
+
+| Area | Representative routes |
+| --- | --- |
+| Health | `GET /health` |
+| Projects and brief | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, `POST/GET/PUT /projects/{id}/idea-analysis` |
+| Workflow | `POST/GET /projects/{id}/workflow`, `POST /projects/{id}/workflow/prepare`, `POST /projects/{id}/workflow/decision`, `GET /review-queue/workflows` |
+| Artifacts and export | `GET/POST /projects/{id}/artifacts`, artifact version routes, `GET /projects/{id}/package/export` |
+| Research | `GET/POST /projects/{id}/research-sources`, source update/delete routes, `POST /projects/{id}/research-plan/refresh` |
+| Review and HITL | project checkpoint routes, `GET /review-queue`, artifact review comment routes |
+| Evaluations and guardrails | consistency and Devil's Advocate evaluation routes; guardrail finding routes |
+| Runs and metrics | `/mlops/runs`, `/mlops/prompts`, `/mlops/cost-summary`, `/mlops/metrics` |
+| Traces and dashboard | project trace routes, `/dashboard/stats`, and `/dashboard/events/{project_id}` |
+
+Routes generally return JSON. Artifact package and artifact export routes return downloadable files. This API does not authenticate callers or enforce user/project ownership.
+
+## Tests and production build
+
+Run backend tests from `backend/` with the project virtual environment active:
+
+```bash
+source .venv/bin/activate
+LLM_PROVIDER=mock DATABASE_URL=sqlite:///./test-nexusflow.db pytest -q
+```
+
+Run frontend checks from `frontend/`:
+
+```bash
+npm run lint
+npx tsc --noEmit
+npm run build
+```
+
+The backend test command uses a separate SQLite filename so it does not use the normal local database. Remove that file when it is no longer needed. Tests use the mock provider and should not require a paid model key.
+
+## Data, security, and troubleshooting
+
+- Local projects and workflow records are stored in `backend/nexusflow.db` when using the documented quick start. Back up or remove that file to manage local state.
+- `.env`, `.venv`, and local SQLite database files are ignored by Git. `.env.example` contains placeholders, not credentials.
+- There is no authentication, authorization, tenant isolation, or authenticated reviewer identity. Do not put sensitive real-world/customer data into a shared or exposed deployment.
+- Keep the API and MCP server bound to trusted local interfaces. Do not expose port 8000 or 8001 to the public internet.
+- CORS is not authentication. Restricting `CORS_ORIGINS` does not prevent non-browser clients from calling the API.
+- SQLite table creation occurs at app startup; there is no migration history or production backup/restore workflow yet.
+- Groq/AWS credentials belong only in the backend environment. If a credential is accidentally committed or shared, revoke and rotate it.
+
+Common local checks:
+
+1. If the web app cannot reach the API, confirm the backend health endpoint and `NEXT_PUBLIC_API_URL`.
+2. If the browser reports a CORS error, ensure the frontend origin appears in the backend `CORS_ORIGINS` JSON list, then restart the API.
+3. If Groq analysis fails, confirm `LLM_PROVIDER`, the backend-only API key, model availability, and provider connectivity.
+4. If stage approval is blocked, read the returned `review_issues`, prepare the current stage, review required artifacts, resolve feedback or blocking findings, and create new artifact versions after a change request.
+
+## Roadmap and contributing
+
+Current next steps for making the project safer and more useful include authentication and project authorization, database migrations and backup strategy, CI, end-to-end browser coverage, real source discovery with citations and explicit permission controls, model-aware cost estimates, and a deployment guide. A2A should be considered when independent agents actually need cross-service task handoff.
 
 - [Architecture and current capabilities](docs/ARCHITECTURE.md)
 - [Implementation status and follow-up plan](docs/IMPLEMENTATION_PLAN.md)
 - [Product requirements and longer-term direction](docs/PRD.md)
 - [Contributing guide](CONTRIBUTING.md)
 
-The repository does not currently include a `LICENSE` file. Add the license you intend before presenting it as open source or accepting reuse contributions.
-
-## Security and data
-
-This prototype has no user authentication or project-level access control. Treat locally stored project data as untrusted and sensitive. Keep the API, database, and MCP server on a trusted development machine; do not expose them to an untrusted network. Do not store production secrets in this repository. Review the code and deployment requirements before using it with real customer or regulated data.
+There is currently no `LICENSE` file. Choose and add a license before describing this repository as open source or accepting contributions under a particular reuse grant.
