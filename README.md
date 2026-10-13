@@ -1,82 +1,121 @@
+
+<div align="center">
+
 # NexusFlow
 
-NexusFlow turns an early software idea into a structured brief, reviewable planning documents, and an exportable project package. It pairs a Next.js workspace with a FastAPI backend, SQLite persistence for local development, optional LLM-backed idea analysis, deterministic review checks, and explicit human approvals.
+### From a raw software idea to a reviewable, implementation-ready project plan.
 
-> **Status:** local-first prototype for development and evaluation. It has no user authentication or project-level authorization and is not safe to expose to the public internet as-is.
+**A local-first project planning workspace with structured idea analysis, versioned deliverables, explicit human approvals, deterministic quality checks, and a read-only MCP interface.**
 
-## Contents
+[Quick Start](#-quick-start) · [How It Works](#-how-it-works) · [Architecture](#-architecture) · [Roadmap](#-roadmap)
 
-- [What NexusFlow does](#what-nexusflow-does)
-- [Current boundaries](#current-boundaries)
-- [Architecture](#architecture)
-- [Requirements](#requirements)
-- [Quick start](#quick-start)
-- [Project workflow](#project-workflow)
-- [LLM providers and token usage](#llm-providers-and-token-usage)
-- [Local MCP server](#local-mcp-server)
-- [Configuration reference](#configuration-reference)
-- [API overview](#api-overview)
-- [Tests and production build](#tests-and-production-build)
-- [Data, security, and troubleshooting](#data-security-and-troubleshooting)
-- [Roadmap and contributing](#roadmap-and-contributing)
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white)
+![Next.js](https://img.shields.io/badge/Frontend-Next.js-000000?logo=next.js&logoColor=white)
+![TypeScript](https://img.shields.io/badge/Language-TypeScript-3178C6?logo=typescript&logoColor=white)
+![SQLite](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite&logoColor=white)
+![Status](https://img.shields.io/badge/Status-Local%20Prototype-orange)
 
-## What NexusFlow does
+</div>
 
-- Create and update software projects, then generate and edit a structured idea brief.
-- Start a persisted workflow using a selected template and stage sequence.
-- Prepare Markdown deliverables, edit them as new versions, and review changes over time.
-- Record explicit approvals, rejections, requests for changes, and revisits.
-- Use a combined review queue for workflow stages and standalone human review checkpoints.
-- Gate workflow approvals on the expected artifact, minimum content, high/critical content findings, unresolved comments, unresolved blocking guardrails, and new artifact versions after revision requests.
-- Record user-curated research sources, findings, notes, and review status; refresh a versioned research plan from that log.
-- Run deterministic consistency and Devil's Advocate evaluations and inspect guardrail findings and agent run records.
-- Export a ZIP package containing the brief, workflow decisions, research source log, review feedback, and artifact version history.
-- Optionally expose read-only project context and artifacts to a local MCP-compatible client.
+---
 
-The interface includes a project dashboard and workspace, brief editor, workflow and decision history, artifacts, research, evaluations, traces, standalone checkpoints, a review queue, and MLOps views for runs, prompts, and metrics.
+> [!IMPORTANT]
+> **Project status: local-first prototype.** NexusFlow currently has no authentication, authorization, tenant isolation, or authenticated reviewer identities. Keep the API and MCP server on trusted local interfaces. Do not expose this prototype to the public internet or use it with sensitive customer data.
 
-## Current boundaries
+## ✨ Why NexusFlow?
 
-NexusFlow is a **human-reviewed project planning workflow**, not a distributed multi-agent system. The Idea Analyst is the only model-backed agent flow. Workflow stages produce transparent drafts from saved project inputs; they do not represent independent agents collaborating. Research source entry is user-curated; the app does not discover or verify sources. Evaluation reports are rule-based rather than model-based.
+Turning an idea into a buildable project takes more than generating a document. Requirements need structure, decisions need a history, feedback needs to be resolved, and approvals should happen deliberately.
 
-Groq and Bedrock are provider options for idea analysis. The development example uses a mock provider so the app can run without cloud credentials. Token counts are recorded when the provider returns them. The cost summary currently estimates Bedrock costs only, so Groq cost is intentionally left blank. Parallel tool calling is not used for idea analysis because that flow makes a single model request and has no independent tool calls to run.
+NexusFlow brings those steps into one workspace. It keeps project context, drafts, artifact versions, research notes, evaluation findings, and human decisions connected—creating a traceable planning history instead of a collection of disconnected documents.
 
-MCP currently provides read-only local access. **A2A is not implemented.** Reviewer names are labels and are not authenticated identities. See [Architecture](docs/ARCHITECTURE.md) and [Implementation Plan](docs/IMPLEMENTATION_PLAN.md) for detail.
+### What You Can Do Today
 
-## Architecture
+- **Shape an idea:** Create a project and generate a structured idea brief.
+- **Run a persisted workflow:** Choose a workflow template and stage sequence, then resume progress later.
+- **Create and revise deliverables:** Prepare Markdown drafts and save edits as durable artifact versions.
+- **Keep humans in control:** Record approvals, rejections, change requests, and revisits explicitly.
+- **Review in one place:** Use the combined review queue for workflow approvals and standalone human-in-the-loop checkpoints.
+- **Track research inputs:** Save participant-entered sources, findings, notes, and review status.
+- **Check quality:** Run deterministic consistency and Devil's Advocate evaluations and inspect guardrail findings.
+- **Export the project:** Generate a ZIP package containing the brief, workflow history, research log, feedback, and artifact versions.
+- **Connect through MCP:** Optionally expose project context and artifacts through a local, read-only MCP server.
 
-```text
-Next.js 16 / React 19 frontend (port 3000)
-        │ HTTP / JSON
-        ▼
-FastAPI backend (port 8000)
-  ├─ REST API routers
-  ├─ services: workflow, artifacts, reviews, research, guardrails, evaluations, MLOps
-  ├─ Idea Analyst: mock / Groq / Amazon Bedrock
-  └─ SQLAlchemy persistence
-        │
-        ▼
-SQLite database (local default: backend/nexusflow.db)
+## 🧭 How It Works
 
-Optional local MCP Streamable HTTP server (127.0.0.1:8001/mcp)
-  └─ read-only project context and artifact tools
+```mermaid
+flowchart TD
+    A["💡 Software Idea"] --> B["Idea Analyst"]
+    B --> C["Structured Project Brief"]
+    C --> D["Choose Workflow"]
+    D --> E["Prepare Stage Draft"]
+    E --> F["Review Artifact & Findings"]
+    F --> G{"Human Decision"}
+    G -->|Request Changes| H["Revise & Create New Version"]
+    H --> F
+    G -->|Approve| I["Continue to Next Stage"]
+    I --> J["Final Review & Export"]
 ```
 
-The backend is organized into `api/`, `agents/`, `guardrails/`, `models/`, `schemas/`, and `services/`. The frontend is a Next.js App Router application under `frontend/src/app/`, with reusable components under `frontend/src/components/` and typed API clients under `frontend/src/lib/`.
+### Workflow Stages
 
-SQLite tables persist projects, briefs, workflow plans and decisions, artifacts and versions, source records, review comments, HITL checkpoints, guardrail findings, evaluations, traces, prompt versions, and agent runs. The application initializes tables on startup; this prototype does not include a production migration workflow.
+| Stage | Deliverable | Current Behavior |
+|---|---|---|
+| **Idea Discovery** | Idea Brief | Uses the saved structured brief; idea analysis can be run first. |
+| **Market Research** | Research Plan | Builds a plan from project context and participant-entered sources; it does not browse the web. |
+| **Technical Feasibility** | Technical Feasibility | Creates an initial planning draft from saved project inputs. |
+| **PRD & Architecture** | Product Requirements, Architecture Outline | Creates Markdown outlines from project inputs and the brief. |
+| **Quality Review** | Quality Review | Collects deterministic consistency and Devil's Advocate findings. |
+| **Final Approval** | Final Package Guide | Lists saved artifacts for final human review. |
 
-## Requirements
+Approvals are gated by configured checks. Required deliverables must exist, content checks must pass, blocking findings and unresolved comments must be addressed, and artifacts must have newer versions after a change request.
 
-- Python 3.10 or newer
-- Node.js 20.9 or newer and npm
-- Optional: a Groq API key or AWS credentials for non-mock idea analysis
+Preparing an existing stage preserves its current artifact and reviewer edits rather than silently overwriting them.
 
-## Quick start
+## 🏗️ Architecture
 
-Open two terminals from the repository root.
+```mermaid
+flowchart TB
+    UI["Next.js 16 / React 19<br/>Dashboard · Workspace · Reviews"]
+    API["FastAPI Backend<br/>REST API · Workflow · Artifacts<br/>Reviews · Research · Evaluations"]
+    LLM["Idea Analyst<br/>Mock · Groq · Amazon Bedrock"]
+    DB[("SQLite<br/>Local Development Persistence")]
+    MCP["Local MCP Server<br/>Read-Only Tools"]
 
-### 1. Backend API
+    UI -->|"HTTP / JSON"| API
+    API --> LLM
+    API -->|"SQLAlchemy"| DB
+    MCP -.->|"Read-only project context"| DB
+```
+
+### Technology Stack
+
+| Layer | Technologies |
+|---|---|
+| Frontend | Next.js App Router, React, TypeScript, Tailwind CSS, shadcn/ui, Lucide |
+| Backend | Python, FastAPI, Pydantic v2, SQLAlchemy 2 |
+| Local Persistence | SQLite |
+| Idea Analysis | Mock, Groq, Amazon Bedrock provider options |
+| Integration | Optional local MCP Streamable HTTP server |
+| Quality & Review | Deterministic evaluations, guardrails, version-linked comments, human approval gates |
+
+The backend is organized around `api/`, `agents/`, `guardrails/`, `models/`, `schemas/`, and `services/`.
+
+The frontend lives under `frontend/src/app/`, with reusable components in `frontend/src/components/` and typed API clients in `frontend/src/lib/`.
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Python **3.10+**
+- Node.js **20.9+** and npm
+- Optional: Groq API key or AWS credentials for live idea analysis
+
+The default local setup uses a mock provider, so you can run the application without LLM credentials.
+
+### 1. Start the Backend
+
+From the repository root, open a terminal and run:
 
 ```bash
 cd backend
@@ -87,9 +126,16 @@ python -m pip install -r requirements.txt
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-The example `.env` selects `LLM_PROVIDER=mock`, so no model credentials are needed. The API creates the SQLite file at `backend/nexusflow.db` when started from `backend/`. Verify it at <http://localhost:8000/health>; interactive API documentation is at <http://localhost:8000/docs>.
+Verify that the API is running:
 
-### 2. Frontend
+- **Health check:** http://localhost:8000/health
+- **Interactive API docs:** http://localhost:8000/docs
+
+The local database is created at `backend/nexusflow.db` when the app is started from the `backend/` directory.
+
+### 2. Start the Frontend
+
+Open a second terminal from the repository root:
 
 ```bash
 cd frontend
@@ -97,42 +143,38 @@ npm ci
 npm run dev
 ```
 
-Open <http://localhost:3000>. The frontend uses `http://localhost:8000` by default. To change this, set `NEXT_PUBLIC_API_URL` in `frontend/.env.local`, then restart the frontend. Only put values safe for browser exposure in `NEXT_PUBLIC_*` variables.
+Open **http://localhost:3000** in your browser.
 
-### 3. Try the project journey
+The frontend uses `http://localhost:8000` by default. To change the API base URL, set `NEXT_PUBLIC_API_URL` in `frontend/.env.local` and restart the frontend.
 
-From the dashboard, choose **Explore with a sample** to create a saved example project, or **Start your own** to enter an idea. Generate the brief, start the workflow, prepare the stage draft, review the artifact, and record your decision. Continue through stages and use the Review Queue to see items needing attention. The sample is created in your local database; it is not a hosted demo or preloaded fixture.
+**Security note:** Only put values safe for browser exposure in `NEXT_PUBLIC_*` variables.
 
-## Project workflow
+### 3. Explore a Project
 
-The default full-product stage sequence is:
+1. Choose **Explore with a sample** to create a saved example, or **Start your own** to enter an idea.
+2. Generate the structured brief.
+3. Start a workflow and prepare the current stage's draft.
+4. Review the artifact, comments, and findings.
+5. Approve the stage or request changes with notes.
+6. Continue through the workflow, then export the project package.
 
-| Stage | Prepared deliverable(s) | What the current implementation does |
-| --- | --- | --- |
-| Idea discovery | Idea Brief | Uses the saved structured brief; generate the brief with idea analysis first. |
-| Market research | Research Plan | Builds a plan from the idea and participant-entered sources. It does not browse the web. |
-| Technical feasibility | Technical Feasibility | Creates a transparent initial planning draft from project inputs. |
-| PRD and architecture | Product Requirements, Architecture Outline | Creates initial Markdown outlines from project inputs and brief. |
-| Quality review | Quality Review | Collects deterministic consistency and Devil's Advocate findings. |
-| Final approval | Final Package Guide | Lists the project's saved artifacts for final human review. |
+The sample is created in your local database; it is not a hosted demo or preloaded fixture.
 
-Every stage requires a human decision. The backend prevents approval until the stage deliverables exist and pass the configured review checks. A request for changes requires notes; before a later approval, every required artifact must have a version newer than that request. Preparing an existing stage preserves its current artifact and reviewer edits rather than silently overwriting them.
+## 🤖 LLM Provider Setup
 
-Workflow templates store a stage plan on the project workflow. The frontend offers starter choices and lets users choose a workflow sequence; valid stage keys are `idea_discovery`, `market_research`, `technical_feasibility`, `prd_architecture`, `quality_review`, and `final_approval`.
+Provider settings are read by the backend from its process environment or `backend/.env`.
 
-Standalone HITL checkpoints are a separate mechanism alongside workflow stage approvals. Both appear in the combined review experience.
+### Mock Provider — Default
 
-## LLM providers and token usage
+```dotenv
+LLM_PROVIDER=mock
+```
 
-Provider configuration is read by the backend from its process environment or `backend/.env`.
-
-### Mock (default for local setup)
-
-`LLM_PROVIDER=mock` returns a predictable sample brief and requires no API key. Use this for UI exploration and tests.
+Returns a predictable sample brief. No API key is required, making it useful for initial setup, UI exploration, and tests.
 
 ### Groq
 
-Set these values in `backend/.env`:
+Add the following to `backend/.env`:
 
 ```dotenv
 LLM_PROVIDER=groq
@@ -140,17 +182,31 @@ GROQ_API_KEY=your_groq_api_key
 GROQ_MODEL=openai/gpt-oss-120b
 ```
 
-Restart the API after changing provider configuration. The backend sends idea analysis to Groq and validates the returned structured data against the brief schema. Check Groq's [current model documentation](https://console.groq.com/docs/models) for available models and capabilities. Keep the key in the backend environment only; never commit it or put it in a frontend environment file.
+Restart the backend after changing configuration. Returned data is validated against the brief schema.
 
-When returned by the provider, input and output token counts appear with idea analysis and are stored in Agent Runs and Metrics. Idea analysis currently makes one model request and caps completion output at 1,200 tokens. Parallel tool calling does not reduce token use and is not used in this request because there are no independent tool calls.
+See the [Groq model documentation](https://console.groq.com/docs/models) for current model availability.
 
 ### Amazon Bedrock
 
-Set `LLM_PROVIDER=bedrock`, configure `AWS_REGION` and `BEDROCK_MODEL_ID`, and provide AWS credentials through the environment or the AWS credential chain used by boto3. Do not commit access keys. The application fallback provider is Bedrock, but `.env.example` selects mock for a credential-free first run.
+Configure the backend environment:
 
-## Local MCP server
+```dotenv
+LLM_PROVIDER=bedrock
+AWS_REGION=us-west-2
+BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20240620-v1:0
+```
 
-Start the API first, then open a third terminal:
+Provide AWS credentials through the environment or the AWS credential chain used by `boto3`. Never commit credentials. The example environment selects `mock` for a credential-free first run.
+
+### Token Usage & Cost Notes
+
+When the provider returns usage data, input and output token counts are recorded in Agent Runs and Metrics.
+
+Idea analysis currently makes one model request and caps completion output at 1,200 tokens. The cost summary currently estimates Bedrock costs only; Groq cost is intentionally left blank. Parallel tool calling is not used because this flow has no independent tool calls.
+
+## 🔌 Local MCP Server
+
+Start the backend first, then open a third terminal:
 
 ```bash
 cd backend
@@ -158,65 +214,79 @@ source .venv/bin/activate
 python -m app.mcp_server
 ```
 
-The Streamable HTTP endpoint is <http://127.0.0.1:8001/mcp>. It binds to loopback and exposes three read-only tools:
+**Endpoint:** http://127.0.0.1:8001/mcp
 
-- `get_project_context(project_id)` — project idea, brief, workflow state, and decisions.
-- `list_project_artifacts(project_id)` — artifact names, types, versions, and update times.
-- `read_project_artifact(project_id, artifact_id)` — latest artifact content after checking that the artifact belongs to the supplied project.
+The server uses Streamable HTTP and exposes three **read-only** tools:
 
-These tools cannot edit or delete data, approve workflow stages, create projects, or perform external research. The server is a local development integration; it has no authentication for network exposure. A2A and connections to external MCP servers are not implemented.
+| Tool | Purpose |
+|---|---|
+| `get_project_context(project_id)` | Read the project idea, brief, workflow state, and decisions. |
+| `list_project_artifacts(project_id)` | List artifact names, types, versions, and update times. |
+| `read_project_artifact(project_id, artifact_id)` | Read the latest artifact content after checking that it belongs to the supplied project. |
 
-## Configuration reference
+These tools cannot mutate data, approve workflow stages, create projects, or perform external research.
 
-Backend variables can be set in `backend/.env` or in the backend process environment. See [.env.example](.env.example) for a copyable template.
+The server is intended for local development and has no authentication for network exposure. **A2A and external MCP server connections are not implemented.**
 
-| Variable | Purpose | Example / fallback |
-| --- | --- | --- |
-| `APP_NAME` | Application name setting | `NexusFlow` |
+## ⚙️ Configuration Reference
+
+See [`.env.example`](.env.example) for the starter configuration.
+
+| Variable | Purpose | Example / Default |
+|---|---|---|
+| `APP_NAME` | Application name | `NexusFlow` |
 | `APP_ENV` | Environment label | `development` |
 | `DEBUG` | Debug setting | `true` |
-| `BACKEND_HOST` | Configured backend host | `0.0.0.0` in settings; local quick start explicitly binds to `127.0.0.1` |
-| `BACKEND_PORT` | Configured backend port | `8000` |
-| `DATABASE_URL` | SQLAlchemy connection URL | `sqlite:///./nexusflow.db` |
-| `CORS_ORIGINS` | JSON list of permitted browser origins | `["http://localhost:3000"]` |
-| `LLM_PROVIDER` | Idea-analysis provider (`mock`, `groq`, `bedrock`) | app fallback `bedrock`; `.env.example` uses `mock` |
-| `GROQ_API_KEY` | Backend-only Groq credential | empty unless Groq is selected |
+| `BACKEND_HOST` | Configured backend host | `0.0.0.0` in settings; quick start binds to loopback |
+| `BACKEND_PORT` | Backend port | `8000` |
+| `DATABASE_URL` | SQLAlchemy database URL | `sqlite:///./nexusflow.db` |
+| `CORS_ORIGINS` | JSON list of allowed browser origins | `["http://localhost:3000"]` |
+| `LLM_PROVIDER` | `mock`, `groq`, or `bedrock` | `.env.example` uses `mock` |
+| `GROQ_API_KEY` | Backend-only Groq credential | Empty unless Groq is selected |
 | `GROQ_MODEL` | Groq model identifier | `openai/gpt-oss-120b` |
 | `AWS_REGION` | AWS region for Bedrock | `us-west-2` |
 | `BEDROCK_MODEL_ID` | Bedrock model identifier | `anthropic.claude-3-5-sonnet-20240620-v1:0` |
-| `LLM_TIMEOUT_SECONDS` | Provider request timeout setting | `60` |
+| `LLM_TIMEOUT_SECONDS` | Provider request timeout | `60` |
 | `NEXT_PUBLIC_API_URL` | Frontend API base URL | `http://localhost:8000` |
 
-`DATABASE_URL` may be pointed at another SQLAlchemy database, but the project only documents and validates SQLite for local use. Other database engines may require a driver, schema migrations, and deployment-specific configuration.
+Other SQLAlchemy database URLs may require a driver, migrations, and deployment-specific configuration. SQLite is the documented and validated local setup; a production migration workflow is not included yet.
 
-## API overview
+## 🧩 API Overview
 
-The complete request and response schemas are available in Swagger UI at <http://localhost:8000/docs>.
+The complete request and response schemas are available in Swagger UI at **http://localhost:8000/docs**.
 
-| Area | Representative routes |
-| --- | --- |
+| Area | Representative Routes |
+|---|---|
 | Health | `GET /health` |
-| Projects and brief | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, `POST/GET/PUT /projects/{id}/idea-analysis` |
-| Workflow | `POST/GET /projects/{id}/workflow`, `POST /projects/{id}/workflow/prepare`, `POST /projects/{id}/workflow/decision`, `GET /review-queue/workflows` |
-| Artifacts and export | `GET/POST /projects/{id}/artifacts`, artifact version routes, `GET /projects/{id}/package/export` |
-| Research | `GET/POST /projects/{id}/research-sources`, source update/delete routes, `POST /projects/{id}/research-plan/refresh` |
-| Review and HITL | project checkpoint routes, `GET /review-queue`, artifact review comment routes |
-| Evaluations and guardrails | consistency and Devil's Advocate evaluation routes; guardrail finding routes |
-| Runs and metrics | `/mlops/runs`, `/mlops/prompts`, `/mlops/cost-summary`, `/mlops/metrics` |
-| Traces and dashboard | project trace routes, `/dashboard/stats`, and `/dashboard/events/{project_id}` |
+| Projects & Brief | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, `/projects/{id}/idea-analysis` |
+| Workflow | `/projects/{id}/workflow`, `/workflow/prepare`, `/workflow/decision`, `/review-queue/workflows` |
+| Artifacts & Export | `/projects/{id}/artifacts`, artifact version routes, `/projects/{id}/package/export` |
+| Research | `/projects/{id}/research-sources`, `/projects/{id}/research-plan/refresh` |
+| Review & HITL | Project checkpoint routes, `/review-queue`, artifact review comment routes |
+| Evaluations & Guardrails | Consistency, Devil's Advocate, and guardrail finding routes |
+| Runs & Metrics | `/mlops/runs`, `/mlops/prompts`, `/mlops/cost-summary`, `/mlops/metrics` |
+| Traces & Dashboard | Project trace routes, `/dashboard/stats`, `/dashboard/events/{project_id}` |
 
-Routes generally return JSON. Artifact package and artifact export routes return downloadable files. This API does not authenticate callers or enforce user/project ownership.
+Routes generally return JSON; artifact and package export routes return downloadable files.
 
-## Tests and production build
+**The API currently does not authenticate callers or enforce user/project ownership.**
 
-Run backend tests from `backend/` with the project virtual environment active:
+## 🧪 Tests & Build Checks
+
+### Backend Tests
+
+Run from `backend/` with the virtual environment active:
 
 ```bash
 source .venv/bin/activate
 LLM_PROVIDER=mock DATABASE_URL=sqlite:///./test-nexusflow.db pytest -q
 ```
 
-Run frontend checks from `frontend/`:
+This uses a separate SQLite database file so the test run does not use your normal local database. Remove the test database when it is no longer needed. Tests should not require a paid model key.
+
+### Frontend Checks
+
+Run from `frontend/`:
 
 ```bash
 npm run lint
@@ -224,32 +294,57 @@ npx tsc --noEmit
 npm run build
 ```
 
-The backend test command uses a separate SQLite filename so it does not use the normal local database. Remove that file when it is no longer needed. Tests use the mock provider and should not require a paid model key.
+## 🔐 Security & Data Notes
 
-## Data, security, and troubleshooting
+- Local project data is stored in `backend/nexusflow.db` with the documented setup.
+- `.env`, `.venv`, and local SQLite files are ignored by Git; `.env.example` should contain placeholders only.
+- There is currently no authentication, authorization, tenant isolation, or authenticated reviewer identity.
+- Keep the API and MCP server on trusted local interfaces. Do not expose ports `8000` or `8001` to the public internet.
+- CORS is not authentication; it does not prevent direct calls from non-browser clients.
+- Tables are initialized on application startup. Production migrations and a backup/restore workflow are not yet included.
+- Keep Groq and AWS credentials in the backend environment only. If a key is exposed, revoke and rotate it.
 
-- Local projects and workflow records are stored in `backend/nexusflow.db` when using the documented quick start. Back up or remove that file to manage local state.
-- `.env`, `.venv`, and local SQLite database files are ignored by Git. `.env.example` contains placeholders, not credentials.
-- There is no authentication, authorization, tenant isolation, or authenticated reviewer identity. Do not put sensitive real-world/customer data into a shared or exposed deployment.
-- Keep the API and MCP server bound to trusted local interfaces. Do not expose port 8000 or 8001 to the public internet.
-- CORS is not authentication. Restricting `CORS_ORIGINS` does not prevent non-browser clients from calling the API.
-- SQLite table creation occurs at app startup; there is no migration history or production backup/restore workflow yet.
-- Groq/AWS credentials belong only in the backend environment. If a credential is accidentally committed or shared, revoke and rotate it.
+### Troubleshooting
 
-Common local checks:
+| Symptom | Check |
+|---|---|
+| Frontend cannot reach API | Confirm the backend is running, check `/health`, and verify `NEXT_PUBLIC_API_URL`. |
+| Browser reports CORS errors | Check that the frontend origin is included in `CORS_ORIGINS`, then restart the backend. |
+| Groq analysis fails | Check `LLM_PROVIDER`, the backend-only key, model availability, and provider connectivity. |
+| Approval is blocked | Read `review_issues`, prepare the current stage, resolve comments/blocking findings, and create new artifact versions after change requests. |
 
-1. If the web app cannot reach the API, confirm the backend health endpoint and `NEXT_PUBLIC_API_URL`.
-2. If the browser reports a CORS error, ensure the frontend origin appears in the backend `CORS_ORIGINS` JSON list, then restart the API.
-3. If Groq analysis fails, confirm `LLM_PROVIDER`, the backend-only API key, model availability, and provider connectivity.
-4. If stage approval is blocked, read the returned `review_issues`, prepare the current stage, review required artifacts, resolve feedback or blocking findings, and create new artifact versions after a change request.
+## 🗺️ Roadmap
 
-## Roadmap and contributing
+NexusFlow is being developed incrementally. Current areas for follow-up include:
 
-Current next steps for making the project safer and more useful include authentication and project authorization, database migrations and backup strategy, CI, end-to-end browser coverage, real source discovery with citations and explicit permission controls, model-aware cost estimates, and a deployment guide. A2A should be considered when independent agents actually need cross-service task handoff.
+- [ ] Authentication, project authorization, and authenticated reviewer identity
+- [ ] Database migrations and backup/restore strategy
+- [ ] Continuous integration and end-to-end browser coverage
+- [ ] External research discovery with citations and explicit permission controls
+- [ ] Model-aware cost estimates across providers
+- [ ] Deployment and operational documentation
+- [ ] Independent agent orchestration when there is a real need for collaboration across services
+- [ ] A2A and external MCP integrations when their boundaries and permissions are defined
+
+## 📚 Project Documentation
 
 - [Architecture and current capabilities](docs/ARCHITECTURE.md)
-- [Implementation status and follow-up plan](docs/IMPLEMENTATION_PLAN.md)
-- [Product requirements and longer-term direction](docs/PRD.md)
+- [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
+- [Product requirements](docs/PRD.md)
 - [Contributing guide](CONTRIBUTING.md)
 
-There is currently no `LICENSE` file. Choose and add a license before describing this repository as open source or accepting contributions under a particular reuse grant.
+## 🤝 Contributing
+
+Contributions, issue reports, and practical feedback are welcome. Please keep changes typed, testable, and modular, and clearly distinguish implemented behavior from planned integrations.
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for project-specific guidance.
+
+There is currently no `LICENSE` file. Until a license is added, do not assume the repository grants permission for reuse or redistribution.
+
+---
+
+<div align="center">
+
+**NexusFlow** · Structured planning. Traceable decisions. Human-reviewed progress.
+
+</div>
