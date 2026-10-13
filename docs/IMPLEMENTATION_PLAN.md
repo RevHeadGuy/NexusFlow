@@ -2,7 +2,7 @@
 
 ## Status
 
-This repository is currently a minimal FastAPI starter. The work below resets the implementation plan to a disciplined incremental build, starting with Foundation and the first working project workflow.
+This repository has a local full-stack prototype: project CRUD, a structured idea brief, persisted workflow decisions, reviewable stage drafts, versioned artifacts, deterministic evaluations, and a read-only MCP server. This plan distinguishes those working foundations from integrations that are still needed for production use.
 
 ## Goals
 
@@ -30,7 +30,7 @@ This repository is currently a minimal FastAPI starter. The work below resets th
 
 ## Phase roadmap
 
-### Phase 1: Foundation (complete)
+### Foundation (implemented for local development)
 - Repository and documentation alignment
 - Backend configuration and environment handling
 - Health endpoint and startup readiness
@@ -43,30 +43,30 @@ Acceptance criteria:
 - Data persists in a local transactional session
 - Tests pass without depending on live LLM access
 
-### Phase 2: First working agent (in progress)
+### Idea discovery (implemented with a provider boundary)
 - Idea Analyst agent implementation
 - Structured brief schema and persistence
 - Real model provider integration with fail-safe configuration
 - Frontend project idea form and response display
 
-### Phase 3: Project workflow
-- Research + PRD + Architecture execution
-- Workflow state transitions and human approval stages
-- Resume-from-persisted-state behavior
+### Workflow and deliverables (prototype implemented)
+- Persisted stage transitions and human decisions
+- Versioned Markdown drafts for research planning, feasibility, PRD, architecture, quality review, and final package guide
+- Research is a plan only; external source discovery and citation are future work
 
-### Phase 4: Artifacts (in progress)
+### Artifacts (partially implemented)
 - Document editor/viewer
 - Version history and export generation
 - ZIP packaging for approved artifacts
 
-### Phase 5: Reliability (in progress)
+### Reliability (partially implemented)
 - Devil's Advocate, consistency check, evaluation engine
 - Deterministic validation and test datasets
 
-### Phase 6: Advanced engineering (in progress)
-- MCP tooling and selective parallel research
-- Trace viewer and observability improvements
-- Agent-specific routing and Redis integration where justified
+### MCP tooling (local, read-only implementation)
+- Streamable HTTP MCP endpoint for project context and artifacts
+- Mutating tools and external MCP server connections are not enabled
+- A2A is not implemented; revisit when independent agents need cross-service task handoff
 
 ### Frontend delivery (separate from backend roadmap)
 - Next.js app shell and dashboard UI
@@ -78,10 +78,11 @@ Acceptance criteria:
 - [x] Foundation and docs are in place
 - [x] Project CRUD backend works
 - [x] First LLM-backed agent executes safely in a structured way
-- [ ] Approval workflow persists decisions
-- [ ] Generated documents are versioned and exportable
-- [ ] Evaluations produce review findings
-- [ ] Final ZIP package is generated deterministically
+- [x] Approval workflow persists decisions
+- [x] Generated stage drafts are versioned and exportable
+- [x] Deterministic evaluations produce review findings
+- [x] MCP exposes read-only project and artifact tools
+- [x] Project artifact ZIP package is generated deterministically
 - [ ] Frontend and backend pass CI checks
 
 ## Risk Notes
