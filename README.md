@@ -1,85 +1,299 @@
-# NexusFlow
 
-NexusFlow turns an early software idea into a structured brief, reviewable planning documents, and an exportable project package. It pairs a Next.js workspace with a FastAPI backend, SQLite persistence for local development, optional LLM-backed idea analysis, deterministic review checks, explicit human approvals, and project-level team access.
+<div align="center">
 
-> **Status:** local-first prototype for development and evaluation. It includes email/password accounts and project roles, but lacks account recovery, email delivery, production-grade session handling, and operational hardening. Do not expose it to the public internet as-is.
+<img width="100%" src="https://capsule-render.vercel.app/api?type=rect&height=250&color=0:050816,40:0B1F36,75:123E70,100:164E63&text=NEXUSFLOW&fontColor=F0F9FF&fontSize=64&fontAlignY=38&desc=IDEAS%20%E2%86%92%20WORKFLOWS%20%E2%86%92%20REVIEWABLE%20PROJECTS&descSize=15&descColor=67E8F9&descAlignY=61&animation=fadeIn" alt="NexusFlow — AI Project Engineering Workspace"/>
 
-## Contents
+<br/>
 
-- [What NexusFlow does](#what-nexusflow-does)
-- [Current boundaries](#current-boundaries)
-- [Architecture](#architecture)
-- [Requirements](#requirements)
-- [Quick start](#quick-start)
-- [Project workflow](#project-workflow)
-- [LLM providers and token usage](#llm-providers-and-token-usage)
-- [Local MCP server](#local-mcp-server)
-- [Configuration reference](#configuration-reference)
-- [API overview](#api-overview)
-- [Tests and production build](#tests-and-production-build)
-- [Data, security, and troubleshooting](#data-security-and-troubleshooting)
-- [Roadmap and contributing](#roadmap-and-contributing)
+### From a raw idea to a structured, reviewable project plan.
 
-## What NexusFlow does
+**An AI-assisted project engineering workspace built around persistent workflows, versioned deliverables, human approvals, and traceable decisions.**
 
-- Create and update software projects, then generate and edit a structured idea brief.
-- Start a persisted workflow using a selected template and stage sequence.
-- Prepare Markdown deliverables, edit them as new versions, and review changes over time.
-- Record explicit approvals, rejections, requests for changes, and revisits.
-- Use a combined review queue for workflow stages and standalone human review checkpoints.
-- Create accounts, invite collaborators using single-use links, and assign owner, editor, reviewer, or viewer access per project.
-- Gate workflow approvals on the expected artifact, minimum content, high/critical content findings, unresolved comments, unresolved blocking guardrails, and new artifact versions after revision requests.
-- Record user-curated research sources, findings, notes, and review status; refresh a versioned research plan from that log.
-- Run deterministic consistency and Devil's Advocate evaluations and inspect guardrail findings and agent run records.
-- Export a ZIP package containing the brief, workflow decisions, research source log, review feedback, and artifact version history.
-- Optionally expose read-only project context and artifacts to a local MCP-compatible client.
+<br/>
 
-The interface includes a project dashboard and workspace, brief editor, workflow and decision history, artifacts, research, evaluations, traces, standalone checkpoints, a review queue, and MLOps views for runs, prompts, and metrics.
+<a href="https://github.com/RevHeadGuy/NexusFlow">
+<img src="https://img.shields.io/badge/EXPLORE-REPOSITORY-0E7490?style=for-the-badge&logo=github&logoColor=white" alt="Explore repository"/>
+</a>
+&nbsp;
+<a href="docs/NexusFlow%20Architecture%20.png">
+<img src="https://img.shields.io/badge/VIEW-ARCHITECTURE-2563EB?style=for-the-badge&logo=diagramsdotnet&logoColor=white" alt="View architecture"/>
+</a>
+&nbsp;
+<a href="docs/IMPLEMENTATION_PLAN.md#phase-roadmap">
+<img src="https://img.shields.io/badge/EXPLORE-ROADMAP-4338CA?style=for-the-badge&logo=github&logoColor=white" alt="Explore roadmap"/>
+</a>
 
-## Current boundaries
+<br/><br/>
 
-NexusFlow is a **human-reviewed project planning workflow**, not a distributed multi-agent system. The Idea Analyst is the only model-backed agent flow. Workflow stages produce transparent drafts from saved project inputs; they do not represent independent agents collaborating. Research source entry is user-curated; the app does not discover or verify sources. Evaluation reports are rule-based rather than model-based.
+<img src="https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js&logoColor=white" alt="Next.js"/>
+<img src="https://img.shields.io/badge/React-19-20232A?style=flat-square&logo=react&logoColor=61DAFB" alt="React"/>
+<img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python"/>
+<img src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI"/>
+<img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript"/>
+<img src="https://img.shields.io/badge/SQLAlchemy-D71F00?style=flat-square&logo=sqlalchemy&logoColor=white" alt="SQLAlchemy"/>
+<img src="https://img.shields.io/badge/MCP-Local%20Integration-0E7490?style=flat-square" alt="MCP integration"/>
+<img src="https://img.shields.io/badge/Status-Local%20Prototype-orange?style=flat-square" alt="Project status"/>
 
-Groq and Bedrock are provider options for idea analysis. The development example uses a mock provider so the app can run without cloud credentials. Token counts are recorded when the provider returns them. The cost summary currently estimates Bedrock costs only, so Groq cost is intentionally left blank. Parallel tool calling is not used for idea analysis because that flow makes a single model request and has no independent tool calls to run.
+</div>
 
-MCP currently provides read-only local access. Since MCP does not yet carry the signed-in user's identity, the server refuses to expose projects shared with multiple members; keep it local. **A2A is not implemented.** See [Architecture](docs/ARCHITECTURE.md) and [Implementation Plan](docs/IMPLEMENTATION_PLAN.md) for detail.
+---
 
-## Architecture
+> [!IMPORTANT]
+> **Project status: local-first prototype.** NexusFlow includes email/password accounts, project roles, and collaborator invitations, but it is not production-hardened. Account recovery, email delivery, secure production session handling, database migrations, and other operational safeguards remain future work. Do not expose this prototype to the public internet as-is.
 
-```text
-Next.js 16 / React 19 frontend (port 3000)
-        │ HTTP / JSON
-        ▼
-FastAPI backend (port 8000)
-  ├─ REST API routers with signed bearer-token authentication and project-role checks
-  ├─ services: workflow, artifacts, reviews, research, guardrails, evaluations, MLOps
-  ├─ Idea Analyst: mock / Groq / Amazon Bedrock
-  └─ SQLAlchemy persistence
-        │
-        ▼
-SQLite database (local default: backend/nexusflow.db)
+## Navigation
 
-Optional local MCP Streamable HTTP server (127.0.0.1:8001/mcp)
-  └─ read-only project context and artifact tools
+- [Why NexusFlow?](#-why-nexusflow)
+- [Features](#-what-you-can-do)
+- [How It Works](#-how-it-works)
+- [Architecture](#-architecture)
+- [Quick Start](#-quick-start)
+- [Workflow & Approvals](#-workflow--human-approvals)
+- [Team Collaboration](#-team-collaboration)
+- [LLM Providers](#-llm-providers)
+- [MCP Integration](#-local-mcp-integration)
+- [API Reference](#-api-overview)
+- [Testing](#-testing--quality)
+- [Security & Limitations](#-security--limitations)
+- [Roadmap](#-roadmap)
+- [Documentation](#-documentation)
+
+---
+
+## 💡 Why NexusFlow?
+
+A software idea is only the beginning.
+
+Turning that idea into an implementation-ready project requires structured requirements, feasibility analysis, architecture decisions, reviewable documents, quality checks, and clear approval points.
+
+NexusFlow brings these activities into one persistent workspace.
+
+Instead of treating AI output as a finished answer, it treats project planning as a sequence of **artifacts, revisions, evaluations, and explicit human decisions**.
+
+### The core idea
+
+<div align="center">
+
+<table>
+<tr>
+<td align="center" width="25%">
+
+<img src="https://img.shields.io/badge/01-DISCOVER-0E7490?style=for-the-badge" alt="Discover"/>
+
+**Understand**
+
+Structure the original idea into a project brief.
+
+</td>
+<td align="center" width="25%">
+
+<img src="https://img.shields.io/badge/02-PLAN-4338CA?style=for-the-badge" alt="Plan"/>
+
+**Prepare**
+
+Generate reviewable project planning documents.
+
+</td>
+<td align="center" width="25%">
+
+<img src="https://img.shields.io/badge/03-VALIDATE-166534?style=for-the-badge" alt="Validate"/>
+
+**Evaluate**
+
+Check content, feedback, and approval requirements.
+
+</td>
+<td align="center" width="25%">
+
+<img src="https://img.shields.io/badge/04-APPROVE-9A3412?style=for-the-badge" alt="Approve"/>
+
+**Decide**
+
+Record human decisions and preserve revision history.
+
+</td>
+</tr>
+</table>
+
+</div>
+
+## ✨ What You Can Do
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### 🧠 Idea Analysis
+
+- Turn a software idea into a structured brief.
+- Use mock, Groq, or Amazon Bedrock provider options.
+- Validate model output against a defined schema.
+- Persist project context for subsequent stages.
+
+</td>
+<td width="50%" valign="top">
+
+### 🔄 Persistent Workflows
+
+- Select reusable workflow templates.
+- Configure a project's stage sequence.
+- Prepare stage-specific Markdown drafts.
+- Resume work from saved workflow state.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 📝 Artifact Lifecycle
+
+- Edit structured project documents.
+- Save changes as durable artifact versions.
+- Track review comments and suggested edits.
+- Export project documentation and history.
+
+</td>
+<td width="50%" valign="top">
+
+### 🛡️ Human-Controlled Quality
+
+- Record approvals, rejections, and change requests.
+- Run deterministic consistency evaluations.
+- Inspect Devil's Advocate and guardrail findings.
+- Prevent approval while configured blockers remain unresolved.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 👥 Project Collaboration
+
+- Create accounts and sign in.
+- Invite collaborators using single-use invitation links.
+- Assign owner, editor, reviewer, or viewer roles.
+- Enforce project membership and role checks through the API.
+
+</td>
+<td width="50%" valign="top">
+
+### 🔌 Developer Integration
+
+- Expose project context through a local MCP server.
+- Read project metadata and artifact content.
+- Inspect workflow history, runs, and metrics.
+- Keep the MCP tools read-only in the current implementation.
+
+</td>
+</tr>
+</table>
+
+## 🧭 How It Works
+
+The current implementation follows a persistent, human-reviewed project lifecycle.
+
+```mermaid
+flowchart TD
+    A["💡 Software Idea"] --> B["Idea Analyst"]
+    B --> C["Structured Project Brief"]
+    C --> D["Select Workflow"]
+    D --> E["Prepare Stage Draft"]
+    E --> F["Review Artifacts & Findings"]
+    F --> G{"Approval Checks"}
+    G -->|Blockers remain| H["Resolve Feedback or Findings"]
+    H --> E
+    G -->|Checks pass| I{"Human Decision"}
+    I -->|Request Changes| J["Revise & Create New Version"]
+    J --> F
+    I -->|Approve| K["Continue to Next Stage"]
+    K --> L["Final Review"]
+    L --> M["Export Project Package"]
 ```
 
-The backend is organized into `api/`, `agents/`, `guardrails/`, `models/`, `schemas/`, and `services/`. The frontend is a Next.js App Router application under `frontend/src/app/`, with reusable components under `frontend/src/components/` and typed API clients under `frontend/src/lib/`.
+### Important implementation distinction
 
-SQLite tables persist projects, briefs, workflow plans and decisions, artifacts and versions, source records, review comments, HITL checkpoints, guardrail findings, evaluations, traces, prompt versions, and agent runs. The application initializes tables on startup; this prototype does not include a production migration workflow.
+NexusFlow is currently a **human-reviewed project planning workflow**, not a distributed multi-agent system.
 
-Account tables store password hashes, project membership roles, and invitation token hashes. Tokens expire after 12 hours. In an existing single-user local database, the first account registered claims previously unowned projects. This is a convenience migration for local data, not an appropriate ownership policy for a multi-tenant production database.
+The Idea Analyst is the only model-backed agent flow. Subsequent stages produce transparent planning drafts from saved project inputs; they do not represent independent autonomous agents collaborating. Research source discovery and verification are also not automated.
 
-## Requirements
+This distinction is intentional: workflow state, artifact revisions, evaluations, and approval decisions are persisted and reviewable rather than simulated as an autonomous multi-agent run.
 
-- Python 3.10 or newer
-- Node.js 20.9 or newer and npm
-- Optional: a Groq API key or AWS credentials for non-mock idea analysis
+---
 
-## Quick start
+## 🏗️ Architecture
 
-Open two terminals from the repository root.
+<div align="center">
 
-### 1. Backend API
+<a href="docs/NexusFlow%20Architecture%20.png">
+<img width="100%" src="docs/NexusFlow%20Architecture%20.png" alt="NexusFlow system architecture diagram"/>
+</a>
+
+<sub>Click the diagram to open the full architecture image.</sub>
+
+<br/><br/>
+
+<a href="docs/ARCHITECTURE.md">
+<img src="https://img.shields.io/badge/READ-ARCHITECTURE%20DOCUMENTATION-0E7490?style=for-the-badge" alt="Architecture documentation"/>
+</a>
+
+</div>
+
+### System overview
+
+```mermaid
+flowchart TB
+    UI["Next.js 16 / React 19<br/>Dashboard · Workspace · Reviews"]
+    API["FastAPI Backend<br/>REST API · Authentication · Project Roles"]
+    SERVICES["Application Services<br/>Workflow · Artifacts · Research<br/>Reviews · Evaluations · MLOps"]
+    LLM["Idea Analyst<br/>Mock · Groq · Amazon Bedrock"]
+    DB[("SQLite<br/>Local Development Persistence")]
+    MCP["Local MCP Server<br/>Read-Only Project Tools"]
+
+    UI -->|"HTTP / JSON + Bearer Token"| API
+    API --> SERVICES
+    SERVICES --> LLM
+    SERVICES --> DB
+    MCP -.->|"Project context and artifacts"| DB
+```
+
+### Technology stack
+
+| Layer | Technologies |
+|---|---|
+| Frontend | Next.js App Router, React, TypeScript, Tailwind CSS, shadcn/ui, Lucide |
+| API | Python, FastAPI, Pydantic v2 |
+| Persistence | SQLAlchemy 2, SQLite for documented local development |
+| Idea Analysis | Mock provider, Groq, Amazon Bedrock |
+| Workflow & Review | Persisted stage transitions, artifact versions, approval gates, review comments |
+| Authentication | Email/password accounts, signed bearer tokens, project roles |
+| Integration | Local MCP Streamable HTTP server with read-only tools |
+| Quality | Deterministic evaluations, guardrails, backend tests, frontend build checks |
+
+The backend is organized into `api/`, `agents/`, `guardrails/`, `models/`, `schemas/`, and `services/`.
+
+The frontend lives under `frontend/src/app/`, with reusable components in `frontend/src/components/` and typed API clients in `frontend/src/lib/`.
+
+### Persistence model
+
+SQLite stores project and brief data, workflow plans and decisions, artifacts and versions, research sources, review comments, HITL checkpoints, guardrail findings, evaluations, traces, prompt versions, agent runs, accounts, project memberships, and invitation token hashes.
+
+The application initializes tables at startup. A production database migration workflow is not included yet.
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Python **3.10+**
+- Node.js **20.9+** and npm
+- Optional: Groq API key or AWS credentials for live idea analysis
+
+The default configuration uses a mock LLM provider, so you can start locally without cloud credentials.
+
+### 1. Start the backend
+
+Open a terminal from the repository root:
 
 ```bash
 cd backend
@@ -90,9 +304,16 @@ python -m pip install -r requirements.txt
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-The example `.env` selects `LLM_PROVIDER=mock`, so no model credentials are needed. The API creates the SQLite file at `backend/nexusflow.db` when started from `backend/`. Verify it at <http://localhost:8000/health>; interactive API documentation is at <http://localhost:8000/docs>.
+Verify the backend:
 
-### 2. Frontend
+- **Health:** [http://localhost:8000/health](http://localhost:8000/health)
+- **Swagger API documentation:** [http://localhost:8000/docs](http://localhost:8000/docs)
+
+The documented local setup creates `backend/nexusflow.db` when the application is started from the `backend/` directory.
+
+### 2. Start the frontend
+
+Open a second terminal from the repository root:
 
 ```bash
 cd frontend
@@ -100,55 +321,105 @@ npm ci
 npm run dev
 ```
 
-Open <http://localhost:3000>. The frontend uses `http://localhost:8000` by default. To change this, set `NEXT_PUBLIC_API_URL` in `frontend/.env.local`, then restart the frontend. Only put values safe for browser exposure in `NEXT_PUBLIC_*` variables.
+Open [http://localhost:3000](http://localhost:3000/).
 
-### 3. Try the project journey
+The frontend uses `http://localhost:8000` by default. To change it, set `NEXT_PUBLIC_API_URL` in `frontend/.env.local` and restart the frontend.
 
-From the dashboard, choose **Explore with a sample** to create a saved example project, or **Start your own** to enter an idea. Generate the brief, start the workflow, prepare the stage draft, review the artifact, and record your decision. Continue through stages and use the Review Queue to see items needing attention. The sample is created in your local database; it is not a hosted demo or preloaded fixture.
+Only place values safe for browser exposure in `NEXT_PUBLIC_*` variables.
 
-On first run, create an account from the sign-in page. The first account on an existing local database becomes owner of its legacy projects. To collaborate, open a project's **Team** tab, create an invitation for a teammate's email, copy the link, and share it. The invited person must sign in or register using that email and accept the invitation. NexusFlow does not send invitation email yet.
+### 3. Create your account
 
-### Project roles
+On first run, register through the sign-in page.
+
+For an existing single-user local database, the first account registered claims previously unowned legacy projects. This is a local convenience migration, not a production multi-tenant ownership policy.
+
+### 4. Explore a project
+
+1. Choose **Explore with a sample** or **Start your own**.
+2. Generate the structured idea brief.
+3. Select a workflow template and stage sequence.
+4. Prepare the current stage's draft.
+5. Review artifacts, feedback, and evaluation findings.
+6. Approve the stage or request changes.
+7. Continue through the workflow and export the project package.
+
+The sample is created in your local database; it is not a hosted demo or preloaded fixture.
+
+---
+
+## 🔄 Workflow & Human Approvals
+
+The default full-product workflow includes six stages.
+
+| Stage | Deliverable | Current behavior |
+|---|---|---|
+| **Idea Discovery** | Idea Brief | Uses the saved structured brief and idea analysis. |
+| **Market Research** | Research Plan | Builds a plan from project context and participant-entered sources. |
+| **Technical Feasibility** | Technical Feasibility | Creates an initial planning draft from saved inputs. |
+| **PRD & Architecture** | Product Requirements and Architecture Outline | Creates Markdown outlines from project inputs and the brief. |
+| **Quality Review** | Quality Review | Collects deterministic consistency and Devil's Advocate findings. |
+| **Final Approval** | Final Package Guide | Lists saved artifacts for final human review. |
+
+### Approval gates
+
+Before a workflow stage can be approved, the backend checks configured requirements, including:
+
+- Required deliverables exist.
+- Content checks satisfy configured requirements.
+- High- and critical-severity findings are addressed where required.
+- Unresolved blocking guardrails and comments are cleared.
+- Required artifacts have newer versions after a change request.
+
+A change request requires notes. Preparing an existing stage preserves its current artifact and reviewer edits rather than silently overwriting them.
+
+### Workflow templates
+
+The current stage keys are:
+
+`idea_discovery` · `market_research` · `technical_feasibility` · `prd_architecture` · `quality_review` · `final_approval`
+
+Standalone human-in-the-loop checkpoints are separate from workflow stage approvals. Both appear in the combined review experience.
+
+---
+
+## 👥 Team Collaboration
+
+NexusFlow supports email/password accounts, project memberships, and invitation-based collaboration.
 
 | Role | Access |
-| --- | --- |
-| Owner | Full access, delete project, manage members and invitations |
-| Editor | Read and change project content, artifacts, research, and workflow setup |
-| Reviewer | Read project data, record workflow/HITL decisions, comment, and resolve review findings |
-| Viewer | Read-only project access |
+|---|---|
+| **Owner** | Full access, project deletion, membership and invitation management |
+| **Editor** | Read and modify project content, artifacts, research, and workflow configuration |
+| **Reviewer** | Read project data, record workflow and HITL decisions, comment, and resolve review findings |
+| **Viewer** | Read-only project access |
 
-The API returns 404 for projects the signed-in account cannot access. New projects automatically make their creator the owner.
+### Invite a collaborator
 
-## Project workflow
+1. Open a project and select its **Team** tab.
+2. Create an invitation for the collaborator's email address.
+3. Copy the generated invitation link.
+4. Share the link with the intended collaborator.
+5. The recipient signs in or registers using that email and accepts the invitation.
 
-The default full-product stage sequence is:
+Invitations are not emailed automatically. The current implementation does not include account verification, password reset, or production-grade account recovery.
 
-| Stage | Prepared deliverable(s) | What the current implementation does |
-| --- | --- | --- |
-| Idea discovery | Idea Brief | Uses the saved structured brief; generate the brief with idea analysis first. |
-| Market research | Research Plan | Builds a plan from the idea and participant-entered sources. It does not browse the web. |
-| Technical feasibility | Technical Feasibility | Creates a transparent initial planning draft from project inputs. |
-| PRD and architecture | Product Requirements, Architecture Outline | Creates initial Markdown outlines from project inputs and brief. |
-| Quality review | Quality Review | Collects deterministic consistency and Devil's Advocate findings. |
-| Final approval | Final Package Guide | Lists the project's saved artifacts for final human review. |
+The API returns `404` for projects the signed-in account cannot access. New projects automatically make their creator the owner.
 
-Every stage requires a human decision. The backend prevents approval until the stage deliverables exist and pass the configured review checks. A request for changes requires notes; before a later approval, every required artifact must have a version newer than that request. Preparing an existing stage preserves its current artifact and reviewer edits rather than silently overwriting them.
+---
 
-Workflow templates store a stage plan on the project workflow. The frontend offers starter choices and lets users choose a workflow sequence; valid stage keys are `idea_discovery`, `market_research`, `technical_feasibility`, `prd_architecture`, `quality_review`, and `final_approval`.
+## 🤖 LLM Providers
 
-Standalone HITL checkpoints are a separate mechanism alongside workflow stage approvals. Both appear in the combined review experience.
+Provider settings are read by the backend from its process environment or `backend/.env`.
 
-## LLM providers and token usage
+### Mock provider
 
-Provider configuration is read by the backend from its process environment or `backend/.env`.
+```dotenv
+LLM_PROVIDER=mock
+```
 
-### Mock (default for local setup)
-
-`LLM_PROVIDER=mock` returns a predictable sample brief and requires no API key. Use this for UI exploration and tests.
+Returns a predictable sample brief without requiring an API key. Recommended for local setup and automated tests.
 
 ### Groq
-
-Set these values in `backend/.env`:
 
 ```dotenv
 LLM_PROVIDER=groq
@@ -156,17 +427,37 @@ GROQ_API_KEY=your_groq_api_key
 GROQ_MODEL=openai/gpt-oss-120b
 ```
 
-Restart the API after changing provider configuration. The backend sends idea analysis to Groq and validates the returned structured data against the brief schema. Check Groq's [current model documentation](https://console.groq.com/docs/models) for available models and capabilities. Keep the key in the backend environment only; never commit it or put it in a frontend environment file.
+Restart the API after changing provider configuration. The backend validates returned structured data against the brief schema.
 
-When returned by the provider, input and output token counts appear with idea analysis and are stored in Agent Runs and Metrics. Idea analysis currently makes one model request and caps completion output at 1,200 tokens. Parallel tool calling does not reduce token use and is not used in this request because there are no independent tool calls.
+See the [Groq model documentation](https://console.groq.com/docs/models) for current model availability.
 
 ### Amazon Bedrock
 
-Set `LLM_PROVIDER=bedrock`, configure `AWS_REGION` and `BEDROCK_MODEL_ID`, and provide AWS credentials through the environment or the AWS credential chain used by boto3. Do not commit access keys. The application fallback provider is Bedrock, but `.env.example` selects mock for a credential-free first run.
+```dotenv
+LLM_PROVIDER=bedrock
+AWS_REGION=us-west-2
+BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20240620-v1:0
+```
 
-## Local MCP server
+Provide AWS credentials through the environment or the AWS credential chain used by `boto3`.
 
-Start the API first, then open a third terminal:
+Never commit API keys or AWS credentials. The example environment selects `mock` so the first run does not require cloud access.
+
+### Token usage and cost tracking
+
+When returned by the provider, input and output token counts are recorded in Agent Runs and Metrics.
+
+Idea analysis currently makes one model request and caps completion output at 1,200 tokens. The cost summary estimates Bedrock costs only; Groq cost is intentionally left blank.
+
+Parallel tool calling is not used for idea analysis because the flow makes one model request and has no independent tool calls.
+
+---
+
+## 🔌 Local MCP Integration
+
+NexusFlow includes a local read-only MCP server for compatible clients.
+
+Start the backend first, then open a third terminal:
 
 ```bash
 cd backend
@@ -174,69 +465,103 @@ source .venv/bin/activate
 python -m app.mcp_server
 ```
 
-The Streamable HTTP endpoint is <http://127.0.0.1:8001/mcp>. It binds to loopback and exposes three read-only tools:
+**Endpoint:** [http://127.0.0.1:8001/mcp](http://127.0.0.1:8001/mcp)
 
-- `get_project_context(project_id)` — project idea, brief, workflow state, and decisions.
-- `list_project_artifacts(project_id)` — artifact names, types, versions, and update times.
-- `read_project_artifact(project_id, artifact_id)` — latest artifact content after checking that the artifact belongs to the supplied project.
+### Available tools
 
-These tools cannot edit or delete data, approve workflow stages, create projects, or perform external research. The server is a local development integration; it has no authentication for network exposure. A2A and connections to external MCP servers are not implemented.
+| Tool | Purpose |
+|---|---|
+| `get_project_context(project_id)` | Read project idea, brief, workflow state, and decisions. |
+| `list_project_artifacts(project_id)` | List artifact names, types, versions, and update times. |
+| `read_project_artifact(project_id, artifact_id)` | Read the latest artifact after checking project ownership of the artifact. |
 
-## Configuration reference
+The MCP server binds to loopback and exposes read-only project access.
 
-Backend variables can be set in `backend/.env` or in the backend process environment. See [.env.example](.env.example) for a copyable template.
+It cannot create projects, edit or delete artifacts, approve workflow stages, or perform external research. Since MCP does not yet carry the signed-in user's identity, the server refuses to expose projects shared with multiple members.
 
-| Variable | Purpose | Example / fallback |
-| --- | --- | --- |
-| `APP_NAME` | Application name setting | `NexusFlow` |
+**Keep MCP local.** It has no authentication for network exposure. A2A and external MCP server connections are not implemented.
+
+---
+
+## ⚙️ Configuration Reference
+
+See [`.env.example`](.env.example) for the environment template.
+
+| Variable | Purpose | Example / default |
+|---|---|---|
+| `APP_NAME` | Application name | `NexusFlow` |
 | `APP_ENV` | Environment label | `development` |
 | `DEBUG` | Debug setting | `true` |
-| `BACKEND_HOST` | Configured backend host | `0.0.0.0` in settings; local quick start explicitly binds to `127.0.0.1` |
-| `BACKEND_PORT` | Configured backend port | `8000` |
-| `DATABASE_URL` | SQLAlchemy connection URL | `sqlite:///./nexusflow.db` |
-| `CORS_ORIGINS` | JSON list of permitted browser origins | `["http://localhost:3000"]` |
-| `LLM_PROVIDER` | Idea-analysis provider (`mock`, `groq`, `bedrock`) | app fallback `bedrock`; `.env.example` uses `mock` |
-| `GROQ_API_KEY` | Backend-only Groq credential | empty unless Groq is selected |
+| `BACKEND_HOST` | Configured backend host | `0.0.0.0` in settings; quick start uses `127.0.0.1` |
+| `BACKEND_PORT` | Backend port | `8000` |
+| `DATABASE_URL` | SQLAlchemy database URL | `sqlite:///./nexusflow.db` |
+| `CORS_ORIGINS` | JSON list of allowed browser origins | `["http://localhost:3000"]` |
+| `LLM_PROVIDER` | Idea analysis provider | `mock`, `groq`, or `bedrock` |
+| `GROQ_API_KEY` | Backend-only Groq credential | Required for Groq |
 | `GROQ_MODEL` | Groq model identifier | `openai/gpt-oss-120b` |
-| `AWS_REGION` | AWS region for Bedrock | `us-west-2` |
-| `BEDROCK_MODEL_ID` | Bedrock model identifier | `anthropic.claude-3-5-sonnet-20240620-v1:0` |
-| `LLM_TIMEOUT_SECONDS` | Provider request timeout setting | `60` |
-| `AUTH_SECRET_KEY` | JWT signing key; set a stable random value for deployment | random per process if omitted locally |
+| `AWS_REGION` | Bedrock region | `us-west-2` |
+| `BEDROCK_MODEL_ID` | Bedrock model identifier | Configured model ID |
+| `LLM_TIMEOUT_SECONDS` | Provider timeout | `60` |
+| `AUTH_SECRET_KEY` | JWT signing key | Set a stable random secret |
 | `AUTH_TOKEN_EXPIRE_MINUTES` | Account session lifetime | `720` |
 | `NEXT_PUBLIC_API_URL` | Frontend API base URL | `http://localhost:8000` |
 
-`DATABASE_URL` may be pointed at another SQLAlchemy database, but the project only documents and validates SQLite for local use. Other database engines may require a driver, schema migrations, and deployment-specific configuration.
+Other SQLAlchemy database URLs may require a driver, migrations, and deployment-specific configuration. SQLite is the documented local setup.
 
-## API overview
+### Authentication configuration
 
-All routes except health, account registration, and login require `Authorization: Bearer <access_token>`. The complete request and response schemas are available in Swagger UI at <http://localhost:8000/docs>.
+Set a stable, high-entropy `AUTH_SECRET_KEY` for each deployment. If omitted, a random process-local key is generated. API restarts invalidate tokens, and multiple workers will not share sessions when using different generated keys.
+
+The frontend currently stores bearer tokens in browser local storage. Before operating an internet-facing service, implement a secure production session design.
+
+---
+
+## 🧩 API Overview
+
+Except for health, account registration, and login, routes require:
+
+```http
+Authorization: Bearer <access_token>
+```
+
+The complete request and response schemas are available in [Swagger UI](http://localhost:8000/docs).
 
 | Area | Representative routes |
-| --- | --- |
+|---|---|
 | Health | `GET /health` |
 | Accounts | `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `POST /auth/invitations/accept` |
-| Projects and brief | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, `POST/GET/PUT /projects/{id}/idea-analysis` |
-| Project team | `GET /projects/{id}/members`, `POST/GET/DELETE /projects/{id}/invitations`, member role/removal and ownership-transfer routes |
-| Workflow | `POST/GET /projects/{id}/workflow`, `POST /projects/{id}/workflow/prepare`, `POST /projects/{id}/workflow/decision`, `GET /review-queue/workflows` |
-| Artifacts and export | `GET/POST /projects/{id}/artifacts`, artifact version routes, `GET /projects/{id}/package/export` |
-| Research | `GET/POST /projects/{id}/research-sources`, source update/delete routes, `POST /projects/{id}/research-plan/refresh` |
-| Review and HITL | project checkpoint routes, `GET /review-queue`, artifact review comment routes |
-| Evaluations and guardrails | consistency and Devil's Advocate evaluation routes; guardrail finding routes |
-| Runs and metrics | `/mlops/runs`, `/mlops/prompts`, `/mlops/cost-summary`, `/mlops/metrics` |
-| Traces and dashboard | project trace routes, `/dashboard/stats`, and `/dashboard/events/{project_id}` |
+| Projects & Brief | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, `/projects/{id}/idea-analysis` |
+| Team & Membership | `/projects/{id}/members`, `/projects/{id}/invitations`, membership and ownership routes |
+| Workflow | `/projects/{id}/workflow`, `/workflow/prepare`, `/workflow/decision`, `/review-queue/workflows` |
+| Artifacts & Export | `/projects/{id}/artifacts`, artifact version routes, `/projects/{id}/package/export` |
+| Research | `/projects/{id}/research-sources`, `/projects/{id}/research-plan/refresh` |
+| Review & HITL | Project checkpoint routes, `/review-queue`, artifact review comment routes |
+| Evaluations & Guardrails | Consistency, Devil's Advocate, and guardrail finding routes |
+| Runs & Metrics | `/mlops/runs`, `/mlops/prompts`, `/mlops/cost-summary`, `/mlops/metrics` |
+| Traces & Dashboard | Project trace routes, `/dashboard/stats`, `/dashboard/events/{project_id}` |
 
-Routes generally return JSON. Artifact package and artifact export routes return downloadable files. Project-level API routes require membership and enforce role permissions.
+Routes generally return JSON. Artifact export and package routes return downloadable files. Project-level API routes enforce membership and role permissions.
 
-## Tests and production build
+---
 
-Run backend tests from `backend/` with the project virtual environment active:
+## 🧪 Testing & Quality
+
+### Backend tests
+
+Run from `backend/` with the virtual environment active:
 
 ```bash
 source .venv/bin/activate
 LLM_PROVIDER=mock DATABASE_URL=sqlite:///./test-nexusflow.db pytest -q
 ```
 
-Run frontend checks from `frontend/`:
+This uses a separate SQLite file so tests do not use the normal local database. Remove the test database when it is no longer needed.
+
+The tests should not require a paid model key.
+
+### Frontend checks
+
+Run from `frontend/`:
 
 ```bash
 npm run lint
@@ -244,34 +569,103 @@ npx tsc --noEmit
 npm run build
 ```
 
-The backend test command uses a separate SQLite filename so it does not use the normal local database. Remove that file when it is no longer needed. Tests use the mock provider and should not require a paid model key.
+### Quality principles
 
-## Data, security, and troubleshooting
+- Persist state instead of simulating successful workflows.
+- Validate structured model output.
+- Preserve artifact history during revisions.
+- Require explicit human decisions.
+- Keep model integrations separate from deterministic evaluation logic.
+- Distinguish implemented capabilities from planned work.
 
-- Local projects and workflow records are stored in `backend/nexusflow.db` when using the documented quick start. Back up or remove that file to manage local state.
-- `.env`, `.venv`, and local SQLite database files are ignored by Git. `.env.example` contains placeholders, not credentials.
-- Email/password accounts and project roles are implemented, but account verification, password reset, login rate limiting, invitation email delivery, organization management, and production session revocation are not. Do not put sensitive customer data into a shared or exposed deployment.
-- The frontend stores bearer tokens in browser local storage. Use a production identity provider and secure HttpOnly cookie/session design before operating an internet-facing service.
-- Keep the API and MCP server bound to trusted local interfaces. Do not expose port 8000 or 8001 to the public internet.
-- CORS is not authentication. Restricting `CORS_ORIGINS` does not prevent non-browser clients from calling the API.
-- SQLite table creation occurs at app startup; there is no migration history or production backup/restore workflow yet.
-- Groq/AWS credentials belong only in the backend environment. If a credential is accidentally committed or shared, revoke and rotate it.
-- Set a stable high-entropy `AUTH_SECRET_KEY` in each deployment. If omitted, a random process-local key is generated; API restarts invalidate tokens, and multiple workers will not share sessions.
+---
 
-Common local checks:
+## 🔐 Security & Limitations
 
-1. If the web app cannot reach the API, confirm the backend health endpoint and `NEXT_PUBLIC_API_URL`.
-2. If the browser reports a CORS error, ensure the frontend origin appears in the backend `CORS_ORIGINS` JSON list, then restart the API.
-3. If Groq analysis fails, confirm `LLM_PROVIDER`, the backend-only API key, model availability, and provider connectivity.
-4. If stage approval is blocked, read the returned `review_issues`, prepare the current stage, review required artifacts, resolve feedback or blocking findings, and create new artifact versions after a change request.
+NexusFlow is a development prototype. The following limitations are important:
 
-## Roadmap and contributing
+- Email/password accounts and project roles are implemented, but account verification, password reset, login rate limiting, invitation email delivery, and production session revocation are not.
+- Bearer tokens are stored in browser local storage; a secure production session design is still needed.
+- Keep the API and MCP server on trusted local interfaces. Do not expose ports `8000` or `8001` to the public internet.
+- CORS is not authentication and does not prevent direct API calls from non-browser clients.
+- SQLite tables are initialized at application startup; production migrations and backup/restore procedures are not included.
+- The MCP server is read-only and does not support authenticated multi-user access.
+- Research sources are participant-entered; automated web discovery and source verification are not implemented.
+- Evaluations are deterministic rather than model-based.
+- The Idea Analyst is the only model-backed agent flow; independent autonomous agent collaboration is not implemented.
+- A2A is not implemented.
 
-Current next steps for making the project safer and more useful include account recovery and verification, secure production sessions, database migrations and backup strategy, CI, end-to-end browser coverage, real source discovery with citations and explicit permission controls, model-aware cost estimates, and a deployment guide. A2A should be considered when independent agents actually need cross-service task handoff.
+### Credential hygiene
 
-- [Architecture and current capabilities](docs/ARCHITECTURE.md)
-- [Implementation status and follow-up plan](docs/IMPLEMENTATION_PLAN.md)
-- [Product requirements and longer-term direction](docs/PRD.md)
-- [Contributing guide](CONTRIBUTING.md)
+- Keep `.env`, `.venv`, and local SQLite databases out of version control.
+- Use placeholders in `.env.example`.
+- Keep Groq and AWS credentials in the backend environment.
+- If a credential is exposed, revoke and rotate it.
+- Configure a stable high-entropy `AUTH_SECRET_KEY` for each deployment.
 
-There is currently no `LICENSE` file. Choose and add a license before describing this repository as open source or accepting contributions under a particular reuse grant.
+### Troubleshooting
+
+| Problem | What to check |
+|---|---|
+| Frontend cannot reach API | Confirm the backend health endpoint and `NEXT_PUBLIC_API_URL`. |
+| CORS error | Check `CORS_ORIGINS` and restart the API. |
+| Groq analysis fails | Verify the provider, API key, model availability, and connectivity. |
+| Approval is blocked | Inspect `review_issues`, resolve comments and blocking findings, and create new artifact versions after change requests. |
+| Login stops working after restart | Check whether a stable `AUTH_SECRET_KEY` is configured. |
+| MCP cannot read a shared project | The current MCP implementation restricts access to projects shared with multiple members. |
+
+---
+
+## 🗺️ Roadmap
+
+NexusFlow is being developed incrementally, with a focus on reliability and traceability before more autonomous behavior.
+
+- [ ] Account recovery, verification, and secure production sessions
+- [ ] Database migrations and backup/restore strategy
+- [ ] CI and end-to-end browser coverage
+- [ ] Automated research discovery with citations and explicit permission controls
+- [ ] Model-aware cost estimates across providers
+- [ ] Deployment and operational documentation
+- [ ] Independent agent orchestration when genuine agent collaboration is required
+- [ ] A2A and external MCP integrations when their boundaries and permissions are defined
+
+See the detailed [Implementation Plan](docs/IMPLEMENTATION_PLAN.md#phase-roadmap) for current status and follow-up work.
+
+## 📚 Documentation
+
+| Document | Description |
+|---|---|
+| [Architecture](docs/ARCHITECTURE.md) | System design, components, and current boundaries |
+| [Architecture Diagram](docs/NexusFlow%20Architecture%20.png) | Visual system architecture |
+| [Implementation Plan](docs/IMPLEMENTATION_PLAN.md) | Milestones, acceptance criteria, and roadmap |
+| [Product Requirements](docs/PRD.md) | Product goals and longer-term direction |
+| [Contributing Guide](CONTRIBUTING.md) | Project contribution guidance |
+| [Environment Template](.env.example) | Local configuration starting point |
+
+## 🤝 Contributing
+
+Contributions, issue reports, and practical feedback are welcome.
+
+Please keep changes modular, typed, testable, and consistent with the current architecture. Include reproducible test steps for behavior changes, and document whether a capability is implemented, partially implemented, or planned.
+
+There is currently no `LICENSE` file. Do not assume this repository grants permission for reuse or redistribution until a license is added.
+
+---
+
+<div align="center">
+
+<img width="100%" src="https://capsule-render.vercel.app/api?type=waving&height=130&color=0:164E63,45:123E70,100:050816&section=footer" alt="NexusFlow footer"/>
+
+### NexusFlow
+
+**Structured planning. Traceable decisions. Human-reviewed progress.**
+
+<sub>Built around the idea that useful AI systems need more than good outputs—they need reviewable processes.</sub>
+
+<br/><br/>
+
+<a href="https://github.com/RevHeadGuy/NexusFlow">
+<img src="https://img.shields.io/badge/EXPLORE-NEXUSFLOW-0E7490?style=for-the-badge&logo=github&logoColor=white" alt="Explore NexusFlow"/>
+</a>
+
+</div>
