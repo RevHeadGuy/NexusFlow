@@ -7,6 +7,7 @@ Thanks for helping improve NexusFlow. It is an early local prototype, so clear b
 - Check the README and architecture notes so proposed work matches current capabilities.
 - For larger changes, open an issue first and describe the problem and intended behavior.
 - Keep claims in the UI and docs aligned with what the code actually does. In particular, distinguish workflow stages from autonomous agents, and research plans from sourced research.
+- Keep project access checks consistent across every new project-scoped route; do not trust reviewer names sent by the browser.
 - Never commit credentials, local databases, or private project data.
 
 ## Local development
