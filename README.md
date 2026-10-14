@@ -1,7 +1,7 @@
 
 <div align="center">
 
-# NexusFlow
+# Nexus
 
 ### From a raw software idea to a reviewable, implementation-ready project plan.
 
