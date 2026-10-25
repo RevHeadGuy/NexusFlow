@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.models.auth import ProjectMembership
 from app.services.mlops_service import (
     activate_prompt_version,
     aggregate_metrics,
@@ -18,6 +20,7 @@ from app.services.mlops_service import (
     list_prompt_versions,
     list_runs,
 )
+from app.services.auth_service import list_user_project_ids
 
 router = APIRouter(prefix="/mlops", tags=["mlops"])
 
@@ -144,6 +147,7 @@ def _serialize_prompt(p) -> PromptVersionRead:
 
 @router.get("/runs", response_model=list[AgentRunRead])
 def get_runs(
+    request: Request,
     project_id: str | None = Query(default=None),
     agent_name: str | None = Query(default=None),
     status: str | None = Query(default=None),
@@ -158,6 +162,7 @@ def get_runs(
         status=status,
         limit=limit,
         offset=offset,
+        project_ids=list_user_project_ids(db, request.state.user.id),
     )
     return [_serialize_run(r) for r in runs]
 
@@ -196,8 +201,15 @@ def get_prompt_versions(agent_name: str, db: Session = Depends(get_db)) -> list[
 def create_prompt(
     agent_name: str,
     payload: PromptCreate,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> PromptVersionRead:
+    is_project_owner = db.scalar(select(ProjectMembership.id).where(
+        ProjectMembership.user_id == request.state.user.id,
+        ProjectMembership.role == "owner",
+    ).limit(1))
+    if not is_project_owner:
+        raise HTTPException(status_code=403, detail="Only project owners can manage shared prompt versions.")
     prompt = create_prompt_version(
         db,
         agent_name=agent_name,
@@ -212,8 +224,15 @@ def create_prompt(
 def activate_prompt(
     agent_name: str,
     version: int,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> PromptVersionRead:
+    is_project_owner = db.scalar(select(ProjectMembership.id).where(
+        ProjectMembership.user_id == request.state.user.id,
+        ProjectMembership.role == "owner",
+    ).limit(1))
+    if not is_project_owner:
+        raise HTTPException(status_code=403, detail="Only project owners can manage shared prompt versions.")
     prompt = activate_prompt_version(db, agent_name, version)
     if prompt is None:
         raise HTTPException(
@@ -230,15 +249,20 @@ def activate_prompt(
 
 @router.get("/cost-summary")
 def get_cost_summary(
+    request: Request,
     project_id: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> dict:
-    return cost_summary(db, project_id=project_id)
+    project_ids = list_user_project_ids(db, request.state.user.id)
+    if project_id and project_id not in project_ids:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    return cost_summary(db, project_id=project_id, project_ids=project_ids)
 
 
 @router.get("/metrics")
 def get_metrics(
+    request: Request,
     agent_name: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> dict:
-    return aggregate_metrics(db, agent_name=agent_name)
+    return aggregate_metrics(db, agent_name=agent_name, project_ids=list_user_project_ids(db, request.state.user.id))

@@ -133,11 +133,16 @@ def list_runs(
     status: str | None = None,
     limit: int = 50,
     offset: int = 0,
+    project_ids: list[str] | None = None,
 ) -> list[AgentRun]:
     stmt = select(AgentRun).order_by(AgentRun.started_at.desc())
 
     if project_id:
         stmt = stmt.where(AgentRun.project_id == project_id)
+    if project_ids is not None:
+        if not project_ids:
+            return []
+        stmt = stmt.where(AgentRun.project_id.in_(project_ids))
     if agent_name:
         stmt = stmt.where(AgentRun.agent_name == agent_name)
     if status:
@@ -303,7 +308,7 @@ def cost_for_run(run: AgentRun) -> float | None:
     return round(input_cost + output_cost, 6)
 
 
-def cost_summary(db: Session, project_id: str | None = None) -> dict:
+def cost_summary(db: Session, project_id: str | None = None, project_ids: list[str] | None = None) -> dict:
     """
     Return a cost breakdown.
     If project_id is given, scopes to that project; otherwise returns global totals.
@@ -311,6 +316,10 @@ def cost_summary(db: Session, project_id: str | None = None) -> dict:
     stmt = select(AgentRun).where(AgentRun.status == "success")
     if project_id:
         stmt = stmt.where(AgentRun.project_id == project_id)
+    if project_ids is not None:
+        if not project_ids:
+            return {"total_input_tokens": 0, "total_output_tokens": 0, "total_estimated_cost_usd": 0.0, "run_count": 0, "by_agent": {}, "project_id": project_id}
+        stmt = stmt.where(AgentRun.project_id.in_(project_ids))
 
     runs = db.scalars(stmt).all()
 
@@ -343,15 +352,17 @@ def cost_summary(db: Session, project_id: str | None = None) -> dict:
     }
 
 
-def aggregate_metrics(db: Session, agent_name: str | None = None) -> dict:
+def aggregate_metrics(db: Session, agent_name: str | None = None, project_ids: list[str] | None = None) -> dict:
     """
     Return aggregate quality metrics (avg score per metric) across all runs.
     """
-    stmt = select(EvaluationScore)
+    stmt = select(EvaluationScore).join(AgentRun, AgentRun.id == EvaluationScore.agent_run_id)
+    if project_ids is not None:
+        if not project_ids:
+            return {"metrics": {}, "agent_name": agent_name}
+        stmt = stmt.where(AgentRun.project_id.in_(project_ids))
     if agent_name:
-        stmt = stmt.join(AgentRun, AgentRun.id == EvaluationScore.agent_run_id).where(
-            AgentRun.agent_name == agent_name
-        )
+        stmt = stmt.where(AgentRun.agent_name == agent_name)
 
     scores = db.scalars(stmt).all()
 

@@ -4,12 +4,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.artifacts import router as artifact_router
+from app.api.auth import router as auth_router
 from app.api.dashboard import router as dashboard_router
 from app.api.evaluations import router as evaluation_router
 from app.api.guardrails import router as guardrail_router
 from app.api.hitl import global_router as review_queue_router
 from app.api.hitl import project_router as hitl_router
 from app.api.mlops import router as mlops_router
+from app.api.members import router as members_router
 from app.api.projects import router as project_router
 from app.api.research import router as research_router
 from app.api.review_comments import router as review_comments_router
@@ -18,9 +20,12 @@ from app.api.workflow import router as workflow_router
 from app.api.workflow import review_router as workflow_review_queue_router
 from app.config import get_settings
 from app.database import init_db
+from app.security import IdentityAndProjectAccessMiddleware
 
 # Model imports ensure SQLAlchemy registers all tables before init_db() runs
+from app.models.agent_message import AgentMessage  # noqa: F401
 from app.models.artifact import ArtifactVersion, ProjectArtifact  # noqa: F401
+from app.models.auth import ProjectInvitation, ProjectMembership, User, WorkflowDecisionActor  # noqa: F401
 from app.models.artifact_comment import ArtifactReviewComment  # noqa: F401
 from app.models.evaluation import EvaluationFinding, EvaluationReport  # noqa: F401
 from app.models.guardrail import GuardrailViolationRecord  # noqa: F401
@@ -56,9 +61,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(IdentityAndProjectAccessMiddleware)
+
+app.include_router(auth_router)
 
 # Core project routes
 app.include_router(project_router)
+app.include_router(members_router)
 app.include_router(workflow_router)
 app.include_router(workflow_review_queue_router)
 app.include_router(artifact_router)

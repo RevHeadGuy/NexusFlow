@@ -5,13 +5,12 @@ so the development tool endpoint is not exposed to the local network.
 """
 
 from mcp.server.mcpserver import MCPServer
-from sqlalchemy import select
+from sqlalchemy import func, select
 
+from app.agents import tools as project_tools
 from app.database import SessionLocal
-from app.models.artifact import ProjectArtifact
+from app.models.auth import ProjectMembership, User
 from app.models.project import Project
-from app.models.project_brief import ProjectBrief
-from app.services.workflow_service import get_workflow_by_project, get_workflow_decisions
 
 mcp = MCPServer(
     "NexusFlow",
@@ -22,40 +21,30 @@ mcp = MCPServer(
 )
 
 
+def _is_single_member_project(db, project_id: str) -> bool:
+    """MCP has no per-user identity yet, so disable it for collaborative accounts."""
+    user_count = db.scalar(select(func.count()).select_from(User)) or 0
+    member_count = db.scalar(
+        select(func.count()).select_from(ProjectMembership).where(ProjectMembership.project_id == project_id)
+    )
+    return user_count <= 1 and member_count == 1
+
+
+_MULTI_MEMBER_ERROR = (
+    "MCP access is disabled when multiple accounts exist because MCP has no "
+    "per-user authentication yet."
+)
+
+
 @mcp.tool()
 def get_project_context(project_id: str) -> dict:
     """Read a project's idea, brief, workflow stage, and recorded decisions."""
     with SessionLocal() as db:
-        project = db.get(Project, project_id)
-        if project is None:
+        if db.get(Project, project_id) is None:
             return {"error": "Project not found"}
-        brief = db.scalar(select(ProjectBrief).where(ProjectBrief.project_id == project_id))
-        workflow = get_workflow_by_project(db, project_id)
-        decisions = get_workflow_decisions(db, workflow.id) if workflow else []
-        return {
-            "project": {
-                "id": project.id,
-                "name": project.name,
-                "description": project.description,
-                "idea": project.idea,
-            },
-            "brief": None if brief is None else {
-                "problem_statement": brief.problem_statement,
-                "target_users": brief.target_users,
-                "goals": brief.goals,
-                "constraints": brief.constraints,
-                "success_criteria": brief.success_criteria,
-                "clarifying_questions": brief.clarifying_questions,
-            },
-            "workflow": None if workflow is None else {
-                "current_stage": workflow.current_stage,
-                "status": workflow.status,
-                "decisions": [
-                    {"stage": item.stage, "action": item.action, "notes": item.notes}
-                    for item in decisions
-                ],
-            },
-        }
+        if not _is_single_member_project(db, project_id):
+            return {"error": _MULTI_MEMBER_ERROR}
+        return project_tools.project_context(db, project_id)
 
 
 @mcp.tool()
@@ -64,42 +53,20 @@ def list_project_artifacts(project_id: str) -> list[dict]:
     with SessionLocal() as db:
         if db.get(Project, project_id) is None:
             return [{"error": "Project not found"}]
-        artifacts = db.scalars(
-            select(ProjectArtifact)
-            .where(ProjectArtifact.project_id == project_id)
-            .order_by(ProjectArtifact.updated_at.desc())
-        ).all()
-        return [
-            {
-                "id": artifact.id,
-                "name": artifact.name,
-                "type": artifact.type,
-                "version": artifact.current_version,
-                "updated_at": artifact.updated_at.isoformat(),
-            }
-            for artifact in artifacts
-        ]
+        if not _is_single_member_project(db, project_id):
+            return [{"error": _MULTI_MEMBER_ERROR}]
+        return project_tools.list_artifacts(db, project_id)
 
 
 @mcp.tool()
 def read_project_artifact(project_id: str, artifact_id: str) -> dict:
     """Read an artifact's latest content after verifying it belongs to the project."""
     with SessionLocal() as db:
-        artifact = db.scalar(
-            select(ProjectArtifact).where(
-                ProjectArtifact.id == artifact_id,
-                ProjectArtifact.project_id == project_id,
-            )
-        )
-        if artifact is None:
-            return {"error": "Artifact not found in this project"}
-        return {
-            "id": artifact.id,
-            "name": artifact.name,
-            "type": artifact.type,
-            "version": artifact.current_version,
-            "content": artifact.content,
-        }
+        if db.get(Project, project_id) is None:
+            return {"error": "Project not found"}
+        if not _is_single_member_project(db, project_id):
+            return {"error": _MULTI_MEMBER_ERROR}
+        return project_tools.read_artifact(db, project_id, artifact_id)
 
 
 if __name__ == "__main__":

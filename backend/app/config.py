@@ -1,4 +1,5 @@
 from functools import lru_cache
+import secrets
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -22,6 +23,8 @@ class Settings(BaseSettings):
     groq_api_key: str | None = None
     groq_model: str = "openai/gpt-oss-120b"
     llm_timeout_seconds: int = 60
+    auth_secret_key: str = Field(default_factory=lambda: secrets.token_urlsafe(48), min_length=32)
+    auth_token_expire_minutes: int = 720
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -47,6 +47,7 @@ def read_sources(project_id: str, db: Session = Depends(get_db)) -> list[Researc
 def add_source(
     project_id: str,
     payload: ResearchSourceCreate,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> ResearchSourceRead:
     if get_project(db, project_id) is None:
@@ -59,7 +60,7 @@ def add_source(
             "url": str(payload.url),
             "finding": payload.finding.strip(),
             "notes": payload.notes.strip() if payload.notes else None,
-            "added_by": payload.added_by.strip(),
+            "added_by": request.state.user.display_name,
         },
     )
     return _read(source)

@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.models.auth import ProjectMembership
 from app.services.hitl_service import (
     add_artifact_feedback,
     create_checkpoint,
@@ -193,6 +195,7 @@ def submit_review_route(
     project_id: str,
     checkpoint_id: str,
     payload: ReviewSubmit,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> CheckpointRead:
     if get_project(db, project_id) is None:
@@ -205,7 +208,7 @@ def submit_review_route(
             action=payload.action,
             reviewer_notes=payload.reviewer_notes,
             human_feedback=payload.human_feedback,
-            reviewed_by=payload.reviewed_by,
+            reviewed_by=request.state.user.display_name,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -291,6 +294,9 @@ global_router = APIRouter(prefix="/review-queue")
 
 
 @global_router.get("", response_model=list[CheckpointRead])
-def get_review_queue(db: Session = Depends(get_db)) -> list[CheckpointRead]:
-    """Global queue of all pending checkpoints across all projects, oldest first."""
-    return [_serialize_checkpoint(cp) for cp in list_all_pending(db)]
+def get_review_queue(request: Request, db: Session = Depends(get_db)) -> list[CheckpointRead]:
+    """Pending checkpoints for projects accessible to this account."""
+    project_ids = db.scalars(
+        select(ProjectMembership.project_id).where(ProjectMembership.user_id == request.state.user.id)
+    ).all()
+    return [_serialize_checkpoint(cp) for cp in list_all_pending(db, list(project_ids))]

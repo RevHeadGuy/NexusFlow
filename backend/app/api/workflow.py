@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.models.project import Project
+from app.models.auth import ProjectMembership, WorkflowDecisionActor
 from app.models.workflow import WorkflowRun
 from app.schemas.workflow import WorkflowDecisionCreate, WorkflowDecisionRead, WorkflowRead, WorkflowReviewQueueRead, WorkflowStart
 from app.services.project_service import get_project
@@ -26,6 +27,11 @@ def _serialize_workflow(db: Session, workflow) -> WorkflowRead:
     template_key, stage_plan = get_workflow_plan(db, workflow.id)
     review_summary = get_stage_review_summary(db, workflow)
     decisions = get_workflow_decisions(db, workflow.id)
+    actor_ids = [decision.id for decision in decisions]
+    actors = db.scalars(
+        select(WorkflowDecisionActor).where(WorkflowDecisionActor.decision_id.in_(actor_ids))
+    ).all() if actor_ids else []
+    actors_by_decision = {actor.decision_id: actor for actor in actors}
     return WorkflowRead(
         id=workflow.id,
         project_id=workflow.project_id,
@@ -47,6 +53,8 @@ def _serialize_workflow(db: Session, workflow) -> WorkflowRead:
                 stage=decision.stage,
                 action=decision.action,
                 notes=decision.notes,
+                reviewer_name=actors_by_decision[decision.id].display_name if decision.id in actors_by_decision else None,
+                reviewer_email=actors_by_decision[decision.id].email if decision.id in actors_by_decision else None,
                 created_at=decision.created_at,
             )
             for decision in decisions
@@ -55,11 +63,13 @@ def _serialize_workflow(db: Session, workflow) -> WorkflowRead:
 
 
 @review_router.get("/workflows", response_model=list[WorkflowReviewQueueRead])
-def list_workflow_reviews(db: Session = Depends(get_db)) -> list[WorkflowReviewQueueRead]:
+def list_workflow_reviews(request: Request, db: Session = Depends(get_db)) -> list[WorkflowReviewQueueRead]:
     rows = db.execute(
         select(WorkflowRun, Project.name)
         .join(Project, Project.id == WorkflowRun.project_id)
+        .join(ProjectMembership, ProjectMembership.project_id == WorkflowRun.project_id)
         .where(WorkflowRun.status.in_(["in_progress", "revision_requested"]))
+        .where(ProjectMembership.user_id == request.state.user.id)
         .order_by(WorkflowRun.updated_at.desc())
     ).all()
     result = []
@@ -134,12 +144,25 @@ def prepare_current_stage(project_id: str, db: Session = Depends(get_db)) -> dic
 
 
 @router.post("/{project_id}/workflow/decision", response_model=WorkflowRead)
-def submit_workflow_decision(project_id: str, payload: WorkflowDecisionCreate, db: Session = Depends(get_db)) -> WorkflowRead:
+def submit_workflow_decision(
+    project_id: str,
+    payload: WorkflowDecisionCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> WorkflowRead:
     if get_project(db, project_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
     try:
-        workflow = record_decision(db, project_id, payload)
+        user = request.state.user
+        workflow = record_decision(
+            db,
+            project_id,
+            payload,
+            actor_user_id=user.id,
+            actor_display_name=user.display_name,
+            actor_email=user.email,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

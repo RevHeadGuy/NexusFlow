@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -113,6 +113,7 @@ def override_violation_route(
     project_id: str,
     violation_id: str,
     payload: OverrideRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> ViolationRead:
     if get_project(db, project_id) is None:
@@ -122,7 +123,7 @@ def override_violation_route(
         db,
         violation_id,
         override_note=payload.override_note,
-        overridden_by=payload.overridden_by,
+        overridden_by=request.state.user.display_name,
     )
     if record is None or record.project_id != project_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Violation not found")

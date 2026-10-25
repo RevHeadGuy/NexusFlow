@@ -24,6 +24,8 @@ class WorkflowDecisionRead(BaseModel):
     stage: str
     action: str
     notes: str | None = None
+    reviewer_name: str | None = None
+    reviewer_email: str | None = None
     created_at: datetime
 
 

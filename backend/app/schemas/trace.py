@@ -18,3 +18,15 @@ class TraceRead(BaseModel):
     message: str
     details: dict | None = None
     created_at: datetime
+
+
+class AgentMessageRead(BaseModel):
+    id: str
+    project_id: str
+    sender: str
+    recipient: str
+    message_type: str
+    content: str
+    status: str
+    in_reply_to: str | None = None
+    created_at: datetime

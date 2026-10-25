@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.artifact import ArtifactVersion, ProjectArtifact
 from app.models.artifact_comment import ArtifactReviewComment
+from app.models.auth import WorkflowDecisionActor
 from app.models.guardrail import GuardrailViolationRecord
 from app.models.project import Project
 from app.models.workflow import WorkflowDecision, WorkflowPlan, WorkflowRun
@@ -171,7 +172,15 @@ def get_stage_review_summary(db: Session, workflow: WorkflowRun) -> dict:
     }
 
 
-def record_decision(db: Session, project_id: str, payload: WorkflowDecisionCreate) -> WorkflowRun:
+def record_decision(
+    db: Session,
+    project_id: str,
+    payload: WorkflowDecisionCreate,
+    *,
+    actor_user_id: str | None = None,
+    actor_display_name: str | None = None,
+    actor_email: str | None = None,
+) -> WorkflowRun:
     workflow = get_or_create_workflow(db, project_id)
     if workflow.status in {"completed", "rejected"}:
         raise ValueError(f"The workflow is already {workflow.status} and cannot accept more decisions.")
@@ -194,6 +203,14 @@ def record_decision(db: Session, project_id: str, payload: WorkflowDecisionCreat
         notes=payload.notes,
     )
     db.add(decision)
+    if actor_user_id and actor_display_name and actor_email:
+        db.flush()
+        db.add(WorkflowDecisionActor(
+            decision_id=decision.id,
+            user_id=actor_user_id,
+            display_name=actor_display_name,
+            email=actor_email,
+        ))
 
     if payload.action == "approve":
         workflow.last_decision = "approve"

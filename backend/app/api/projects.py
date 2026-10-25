@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.agents import idea_analyst
 from app.api.deps import get_db
 from app.guardrails import run_guardrails
+from app.models.auth import ProjectMembership
 from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
 from app.schemas.project_brief import ProjectBriefBase, ProjectBriefRead
 from app.services.guardrail_service import persist_violations
@@ -16,8 +18,12 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 
 
 @router.get("", response_model=list[ProjectRead])
-def read_projects(db: Session = Depends(get_db)) -> list[ProjectRead]:
-    projects = list_projects(db)
+def read_projects(request: Request, db: Session = Depends(get_db)) -> list[ProjectRead]:
+    project_ids = set(db.scalars(
+        select(ProjectMembership.project_id)
+        .where(ProjectMembership.user_id == request.state.user.id)
+    ).all())
+    projects = [project for project in list_projects(db) if project.id in project_ids]
     return [
         ProjectRead(
             id=project.id,
@@ -33,8 +39,10 @@ def read_projects(db: Session = Depends(get_db)) -> list[ProjectRead]:
 
 
 @router.post("", response_model=ProjectRead, status_code=status.HTTP_201_CREATED)
-def create_project_route(payload: ProjectCreate, db: Session = Depends(get_db)) -> ProjectRead:
+def create_project_route(payload: ProjectCreate, request: Request, db: Session = Depends(get_db)) -> ProjectRead:
     project = create_project(db, payload)
+    db.add(ProjectMembership(project_id=project.id, user_id=request.state.user.id, role="owner"))
+    db.commit()
     return ProjectRead(
         id=project.id,
         name=project.name,

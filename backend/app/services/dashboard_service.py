@@ -13,14 +13,26 @@ from app.models.project import Project
 from app.models.workflow import WorkflowRun
 
 
-def get_project_stats(db: Session) -> dict:
+def get_project_stats(db: Session, project_ids: list[str]) -> dict:
     """
     Returns counts of projects grouped by status,
     plus workflow stage distribution and pending reviews.
     """
     # Projects by status
+    if not project_ids:
+        return {
+            "total_projects": 0,
+            "projects_by_status": {},
+            "workflows_by_stage": {},
+            "workflows_by_status": {},
+            "pending_checkpoints": 0,
+            "blocking_violations": 0,
+            "recent_agent_runs": [],
+        }
+
     status_rows = db.execute(
         select(Project.status, func.count(Project.id))
+        .where(Project.id.in_(project_ids))
         .group_by(Project.status)
     ).all()
     projects_by_status = {row[0]: row[1] for row in status_rows}
@@ -29,6 +41,7 @@ def get_project_stats(db: Session) -> dict:
     # Workflow stage distribution
     stage_rows = db.execute(
         select(WorkflowRun.current_stage, func.count(WorkflowRun.id))
+        .where(WorkflowRun.project_id.in_(project_ids))
         .group_by(WorkflowRun.current_stage)
     ).all()
     workflows_by_stage = {row[0]: row[1] for row in stage_rows}
@@ -36,13 +49,16 @@ def get_project_stats(db: Session) -> dict:
     # Workflow status distribution
     wf_status_rows = db.execute(
         select(WorkflowRun.status, func.count(WorkflowRun.id))
+        .where(WorkflowRun.project_id.in_(project_ids))
         .group_by(WorkflowRun.status)
     ).all()
     workflows_by_status = {row[0]: row[1] for row in wf_status_rows}
 
     # Pending HITL checkpoints
     pending_checkpoints = db.scalar(
-        select(func.count(HumanCheckpoint.id)).where(HumanCheckpoint.status == "pending")
+        select(func.count(HumanCheckpoint.id)).where(
+            HumanCheckpoint.status == "pending", HumanCheckpoint.project_id.in_(project_ids)
+        )
     ) or 0
 
     # Unresolved guardrail violations (high/critical)
@@ -50,12 +66,14 @@ def get_project_stats(db: Session) -> dict:
         select(func.count(GuardrailViolationRecord.id)).where(
             GuardrailViolationRecord.severity.in_(["high", "critical"]),
             GuardrailViolationRecord.resolved_at.is_(None),
+            GuardrailViolationRecord.project_id.in_(project_ids),
         )
     ) or 0
 
     # Recent agent runs (last 5)
     recent_runs = db.scalars(
         select(AgentRun)
+        .where(AgentRun.project_id.in_(project_ids))
         .order_by(AgentRun.started_at.desc())
         .limit(5)
     ).all()

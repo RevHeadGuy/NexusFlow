@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -48,6 +48,7 @@ def add_comment(
     project_id: str,
     artifact_id: str,
     payload: ArtifactReviewCommentCreate,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> ArtifactReviewCommentRead:
     if get_project(db, project_id) is None:
@@ -63,7 +64,7 @@ def add_comment(
         artifact_id,
         payload.version_number,
         {
-            "reviewer_name": payload.reviewer_name.strip(),
+            "reviewer_name": request.state.user.display_name,
             "section_key": payload.section_key.strip() or "Document",
             "comment": payload.comment.strip(),
             "suggested_edit": payload.suggested_edit.strip() if payload.suggested_edit else None,

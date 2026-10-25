@@ -1,13 +1,8 @@
 from __future__ import annotations
 
-import json
-
-import httpx
 from pydantic import BaseModel, Field
-from strands import Agent
-from strands.models import BedrockModel
 
-from app.config import get_settings
+from app.agents.base import BaseAgent
 
 
 class IdeaBriefOutput(BaseModel):
@@ -31,82 +26,35 @@ Requirements:
 """
 
 
-def _build_model() -> BedrockModel:
-    settings = get_settings()
-    provider = settings.llm_provider.lower()
+class IdeaAnalystAgent(BaseAgent):
+    """Turns a raw product idea into a structured, schema-validated brief."""
 
-    if provider != "bedrock":
-        raise RuntimeError(
-            f"Unsupported LLM provider '{settings.llm_provider}'. "
-            "Phase 2 currently supports the Bedrock provider configuration."
-        )
-
-    aws_key_id = settings.aws_access_key_id or None
-    aws_secret = settings.aws_secret_access_key or None
-    if not aws_key_id or not aws_secret:
-        raise RuntimeError(
-            "Bedrock model configuration is missing AWS credentials. "
-            "Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY or use a mocked provider in tests."
-        )
-
-    return BedrockModel(
-        model_id=settings.bedrock_model_id,
-        region_name=settings.aws_region,
-        api_key=settings.llm_api_key,
-    )
+    agent_name = "idea_analyst"
+    output_schema = IdeaBriefOutput
+    default_prompt = IDEA_ANALYST_PROMPT
+    max_output_tokens = 1200
+    mock_sample = {
+        "problem_statement": (
+            "The project needs a concrete problem statement derived from the user idea."
+        ),
+        "target_users": ["target users"],
+        "goals": ["define a clear goal"],
+        "constraints": ["document assumptions"],
+        "success_criteria": ["establish measurable outcomes"],
+        "clarifying_questions": ["What is the primary user problem you want to solve?"],
+    }
 
 
 def analyze_idea(idea: str) -> tuple[dict[str, object], dict[str, object] | None]:
-    settings = get_settings()
+    """Analyze a raw idea and return ``(brief_dict, token_usage_or_None)``.
+
+    Behavior and return shape are unchanged from the original implementation;
+    provider selection now lives in :mod:`app.agents.providers` and the call flow
+    in :class:`app.agents.base.BaseAgent`.
+    """
     if not idea or not idea.strip():
         raise ValueError("Idea text is required for analysis.")
 
-    if settings.llm_provider.lower() == "mock":
-        return {
-            "problem_statement": "The project needs a concrete problem statement derived from the user idea.",
-            "target_users": ["target users"],
-            "goals": ["define a clear goal"],
-            "constraints": ["document assumptions"],
-            "success_criteria": ["establish measurable outcomes"],
-            "clarifying_questions": ["What is the primary user problem you want to solve?"],
-        }, None
-
-    if settings.llm_provider.lower() == "groq":
-        if not settings.groq_api_key:
-            raise RuntimeError("Groq is selected but GROQ_API_KEY is missing from backend/.env.")
-        try:
-            response = httpx.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {settings.groq_api_key}"},
-                json={
-                    "model": settings.groq_model,
-                    "messages": [
-                        {"role": "system", "content": IDEA_ANALYST_PROMPT},
-                        {"role": "user", "content": idea},
-                    ],
-                    "response_format": {"type": "json_object"},
-                    "max_completion_tokens": 1200,
-                    "temperature": 0.2,
-                },
-                timeout=settings.llm_timeout_seconds,
-            )
-            response.raise_for_status()
-            body = response.json()
-            content = body["choices"][0]["message"]["content"]
-            brief = IdeaBriefOutput.model_validate(json.loads(content))
-        except httpx.HTTPStatusError as exc:
-            raise RuntimeError(f"Groq request failed with HTTP {exc.response.status_code}.") from exc
-        except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError) as exc:
-            raise RuntimeError("Groq returned an invalid or unavailable analysis response.") from exc
-        usage = body.get("usage") or {}
-        return brief.model_dump(), {
-            "provider": "groq",
-            "model": body.get("model", settings.groq_model),
-            "input_tokens": usage.get("prompt_tokens"),
-            "output_tokens": usage.get("completion_tokens"),
-            "total_tokens": usage.get("total_tokens"),
-        }
-
-    agent = Agent(model=_build_model(), system_prompt=IDEA_ANALYST_PROMPT)
-    brief = agent.structured_output(IdeaBriefOutput, prompt=idea)
-    return brief.model_dump(), None
+    agent = IdeaAnalystAgent()
+    result = agent.run(idea)
+    return result.output, result.usage

@@ -81,11 +81,13 @@ def list_checkpoints(
     return db.scalars(stmt).all()
 
 
-def list_all_pending(db: Session) -> list[HumanCheckpoint]:
-    """Global pending queue — across all projects, oldest first."""
+def list_all_pending(db: Session, project_ids: list[str]) -> list[HumanCheckpoint]:
+    """Pending checkpoints for projects visible to the current account."""
+    if not project_ids:
+        return []
     return db.scalars(
         select(HumanCheckpoint)
-        .where(HumanCheckpoint.status == "pending")
+        .where(HumanCheckpoint.status == "pending", HumanCheckpoint.project_id.in_(project_ids))
         .order_by(HumanCheckpoint.created_at.asc())
     ).all()
 
