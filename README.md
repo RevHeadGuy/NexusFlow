@@ -1,8 +1,8 @@
 # NexusFlow
 
-NexusFlow turns an early software idea into a structured brief, reviewable planning documents, and an exportable project package. It pairs a Next.js workspace with a FastAPI backend, SQLite persistence for local development, optional LLM-backed idea analysis, deterministic review checks, and explicit human approvals.
+NexusFlow turns an early software idea into a structured brief, reviewable planning documents, and an exportable project package. It pairs a Next.js workspace with a FastAPI backend, SQLite persistence for local development, a multi-agent generation pipeline backed by a pluggable LLM provider, deterministic review checks, explicit human approvals, and project-level team access.
 
-> **Status:** local-first prototype for development and evaluation. It has no user authentication or project-level authorization and is not safe to expose to the public internet as-is.
+> **Status:** local-first prototype for development and evaluation. It includes email/password accounts and project roles, but lacks account recovery, email delivery, production-grade session handling, and operational hardening. Do not expose it to the public internet as-is.
 
 ## Contents
 
@@ -24,9 +24,11 @@ NexusFlow turns an early software idea into a structured brief, reviewable plann
 
 - Create and update software projects, then generate and edit a structured idea brief.
 - Start a persisted workflow using a selected template and stage sequence.
+- Generate stage deliverables with a pipeline of specialized agents (idea analysis, market research, technical feasibility, PRD, architecture, and quality evaluation) when a live LLM provider is configured.
 - Prepare Markdown deliverables, edit them as new versions, and review changes over time.
 - Record explicit approvals, rejections, requests for changes, and revisits.
 - Use a combined review queue for workflow stages and standalone human review checkpoints.
+- Create accounts, invite collaborators using single-use links, and assign owner, editor, reviewer, or viewer access per project.
 - Gate workflow approvals on the expected artifact, minimum content, high/critical content findings, unresolved comments, unresolved blocking guardrails, and new artifact versions after revision requests.
 - Record user-curated research sources, findings, notes, and review status; refresh a versioned research plan from that log.
 - Run deterministic consistency and Devil's Advocate evaluations and inspect guardrail findings and agent run records.
@@ -37,11 +39,13 @@ The interface includes a project dashboard and workspace, brief editor, workflow
 
 ## Current boundaries
 
-NexusFlow is a **human-reviewed project planning workflow**, not a distributed multi-agent system. The Idea Analyst is the only model-backed agent flow. Workflow stages produce transparent drafts from saved project inputs; they do not represent independent agents collaborating. Research source entry is user-curated; the app does not discover or verify sources. Evaluation reports are rule-based rather than model-based.
+NexusFlow is a **human-reviewed, multi-agent project planning workflow**. Several stages are backed by specialized agents that share a common provider abstraction, guardrail chain, and run-tracking lifecycle. Every stage still requires explicit human review before the workflow advances. Research source entry is user-curated; the app does not discover or verify external sources, and agents do not browse the web. The deterministic consistency and Devil's Advocate reports remain rule-based; the Quality Evaluator agent adds a complementary model-based review when a live provider is configured.
 
-Groq and Bedrock are provider options for idea analysis. The development example uses a mock provider so the app can run without cloud credentials. Token counts are recorded when the provider returns them. The cost summary currently estimates Bedrock costs only, so Groq cost is intentionally left blank. Parallel tool calling is not used for idea analysis because that flow makes a single model request and has no independent tool calls to run.
+Agent generation runs only with a live provider (Groq or Bedrock). The development example uses a **mock provider** so the app runs without cloud credentials; on mock, agent-backed stages fall back to transparent deterministic templates rather than implying model reasoning that did not happen. Token counts are recorded when the provider returns them. The cost summary currently estimates Bedrock costs only, so Groq cost is intentionally left blank.
 
-MCP currently provides read-only local access. **A2A is not implemented.** Reviewer names are labels and are not authenticated identities. See [Architecture](docs/ARCHITECTURE.md) and [Implementation Plan](docs/IMPLEMENTATION_PLAN.md) for detail.
+Agents can read prior project context and artifacts through an **in-process tool layer** that shares its implementation with the MCP server, so a later stage can ground its output in earlier deliverables. Agents also communicate through a small, persisted **agent-to-agent (A2A) message bus**: one stage hands context forward to the next, and the handoffs are recorded as project traces and visible in the A2A message log.
+
+A2A here is an **internal, in-process message bus within a single project**, not a cross-service or cross-network agent protocol. MCP provides read-only local access and, because it does not yet carry the signed-in user's identity, the server refuses to expose projects shared with multiple members; keep it local. Connections to external MCP servers are not implemented. See [Architecture](docs/ARCHITECTURE.md) and [Implementation Plan](docs/IMPLEMENTATION_PLAN.md) for detail.
 
 ## Architecture
 
@@ -50,21 +54,26 @@ Next.js 16 / React 19 frontend (port 3000)
         │ HTTP / JSON
         ▼
 FastAPI backend (port 8000)
-  ├─ REST API routers
-  ├─ services: workflow, artifacts, reviews, research, guardrails, evaluations, MLOps
-  ├─ Idea Analyst: mock / Groq / Amazon Bedrock
+  ├─ REST API routers with signed bearer-token authentication and project-role checks
+  ├─ services: workflow, orchestrator, artifacts, reviews, research, guardrails, evaluations, MLOps, A2A messages
+  ├─ agents: idea analyst, market research, technical feasibility, PRD, architecture, quality evaluator
+  │    └─ BaseAgent + LLM provider abstraction (mock / Groq / Amazon Bedrock)
+  ├─ orchestrator: start run → agent → guardrails → persist → tools → A2A handoff → trace
+  ├─ project tool layer: read-only context/artifact tools shared with the MCP server
   └─ SQLAlchemy persistence
         │
         ▼
 SQLite database (local default: backend/nexusflow.db)
 
 Optional local MCP Streamable HTTP server (127.0.0.1:8001/mcp)
-  └─ read-only project context and artifact tools
+  └─ read-only project context and artifact tools (same implementation agents use)
 ```
 
-The backend is organized into `api/`, `agents/`, `guardrails/`, `models/`, `schemas/`, and `services/`. The frontend is a Next.js App Router application under `frontend/src/app/`, with reusable components under `frontend/src/components/` and typed API clients under `frontend/src/lib/`.
+The backend is organized into `api/`, `agents/`, `guardrails/`, `models/`, `schemas/`, and `services/`. The `agents/` package holds the provider abstraction (`providers.py`), the shared `BaseAgent` (`base.py`), the per-stage agents, and the read-only project tool layer (`tools.py`). The `services/orchestrator_service.py` runs each agent through a single lifecycle (run tracking, guardrails, tools, A2A, and tracing), and `services/agent_message_service.py` backs the A2A message bus. The frontend is a Next.js App Router application under `frontend/src/app/`, with reusable components under `frontend/src/components/` and typed API clients under `frontend/src/lib/`.
 
-SQLite tables persist projects, briefs, workflow plans and decisions, artifacts and versions, source records, review comments, HITL checkpoints, guardrail findings, evaluations, traces, prompt versions, and agent runs. The application initializes tables on startup; this prototype does not include a production migration workflow.
+SQLite tables persist projects, briefs, workflow plans and decisions, artifacts and versions, source records, review comments, HITL checkpoints, guardrail findings, evaluations, traces, prompt versions, agent runs, and agent-to-agent messages. The application initializes tables on startup; this prototype does not include a production migration workflow.
+
+Account tables store password hashes, project membership roles, and invitation token hashes. Tokens expire after 12 hours. In an existing single-user local database, the first account registered claims previously unowned projects. This is a convenience migration for local data, not an appropriate ownership policy for a multi-tenant production database.
 
 ## Requirements
 
@@ -103,6 +112,19 @@ Open <http://localhost:3000>. The frontend uses `http://localhost:8000` by defau
 
 From the dashboard, choose **Explore with a sample** to create a saved example project, or **Start your own** to enter an idea. Generate the brief, start the workflow, prepare the stage draft, review the artifact, and record your decision. Continue through stages and use the Review Queue to see items needing attention. The sample is created in your local database; it is not a hosted demo or preloaded fixture.
 
+On first run, create an account from the sign-in page. The first account on an existing local database becomes owner of its legacy projects. To collaborate, open a project's **Team** tab, create an invitation for a teammate's email, copy the link, and share it. The invited person must sign in or register using that email and accept the invitation. NexusFlow does not send invitation email yet.
+
+### Project roles
+
+| Role | Access |
+| --- | --- |
+| Owner | Full access, delete project, manage members and invitations |
+| Editor | Read and change project content, artifacts, research, and workflow setup |
+| Reviewer | Read project data, record workflow/HITL decisions, comment, and resolve review findings |
+| Viewer | Read-only project access |
+
+The API returns 404 for projects the signed-in account cannot access. New projects automatically make their creator the owner.
+
 ## Project workflow
 
 The default full-product stage sequence is:
@@ -110,13 +132,13 @@ The default full-product stage sequence is:
 | Stage | Prepared deliverable(s) | What the current implementation does |
 | --- | --- | --- |
 | Idea discovery | Idea Brief | Uses the saved structured brief; generate the brief with idea analysis first. |
-| Market research | Research Plan | Builds a plan from the idea and participant-entered sources. It does not browse the web. |
-| Technical feasibility | Technical Feasibility | Creates a transparent initial planning draft from project inputs. |
-| PRD and architecture | Product Requirements, Architecture Outline | Creates initial Markdown outlines from project inputs and brief. |
-| Quality review | Quality Review | Collects deterministic consistency and Devil's Advocate findings. |
+| Market research | Research Plan, Market Analysis | Builds a plan from the idea and participant-entered sources (no web browsing). With a live provider, the Market Research agent adds a Market Analysis artifact and hands context to the feasibility stage. |
+| Technical feasibility | Technical Feasibility | With a live provider, the Technical Feasibility agent assesses stack, build-vs-buy, complexity, and risks, then hands context to the architecture stage. Falls back to a transparent template on mock. |
+| PRD and architecture | Product Requirements, Architecture Outline | With a live provider, the PRD and Architecture agents generate these; the Architecture agent reads the PRD and feasibility artifacts through the project tool layer. Falls back to templates on mock. |
+| Quality review | Quality Review, Agent Quality Review | Collects deterministic consistency and Devil's Advocate findings. With a live provider, the Quality Evaluator agent adds a complementary model-based review. |
 | Final approval | Final Package Guide | Lists the project's saved artifacts for final human review. |
 
-Every stage requires a human decision. The backend prevents approval until the stage deliverables exist and pass the configured review checks. A request for changes requires notes; before a later approval, every required artifact must have a version newer than that request. Preparing an existing stage preserves its current artifact and reviewer edits rather than silently overwriting them.
+Deliverables marked for a live provider fall back to transparent deterministic templates on the mock provider, so a credential-free run never implies model reasoning that did not happen. Every stage requires a human decision. The backend prevents approval until the stage deliverables exist and pass the configured review checks. A request for changes requires notes; before a later approval, every required artifact must have a version newer than that request. Preparing an existing stage preserves its current artifact and reviewer edits rather than silently overwriting them.
 
 Workflow templates store a stage plan on the project workflow. The frontend offers starter choices and lets users choose a workflow sequence; valid stage keys are `idea_discovery`, `market_research`, `technical_feasibility`, `prd_architecture`, `quality_review`, and `final_approval`.
 
@@ -126,9 +148,11 @@ Standalone HITL checkpoints are a separate mechanism alongside workflow stage ap
 
 Provider configuration is read by the backend from its process environment or `backend/.env`.
 
+The provider selected by `LLM_PROVIDER` is shared by every agent (idea analysis plus the market research, technical feasibility, PRD, architecture, and quality evaluator stages). Each agent validates its structured output against a schema and runs through the guardrail chain before its result is persisted.
+
 ### Mock (default for local setup)
 
-`LLM_PROVIDER=mock` returns a predictable sample brief and requires no API key. Use this for UI exploration and tests.
+`LLM_PROVIDER=mock` returns predictable sample output and requires no API key. Use this for UI exploration and tests. On the mock provider, agent-backed stages do not call a model; they fall back to transparent deterministic templates.
 
 ### Groq
 
@@ -140,9 +164,9 @@ GROQ_API_KEY=your_groq_api_key
 GROQ_MODEL=openai/gpt-oss-120b
 ```
 
-Restart the API after changing provider configuration. The backend sends idea analysis to Groq and validates the returned structured data against the brief schema. Check Groq's [current model documentation](https://console.groq.com/docs/models) for available models and capabilities. Keep the key in the backend environment only; never commit it or put it in a frontend environment file.
+Restart the API after changing provider configuration. The backend sends each agent request to Groq and validates the returned JSON against that agent's schema. The provider requests a JSON object and tolerates common formatting quirks (for example, coercing a comma-separated string or a categorized object into the list a field expects) before validation. Check Groq's [current model documentation](https://console.groq.com/docs/models) for available models and capabilities. Keep the key in the backend environment only; never commit it or put it in a frontend environment file.
 
-When returned by the provider, input and output token counts appear with idea analysis and are stored in Agent Runs and Metrics. Idea analysis currently makes one model request and caps completion output at 1,200 tokens. Parallel tool calling does not reduce token use and is not used in this request because there are no independent tool calls.
+When returned by the provider, input and output token counts appear with each agent run and are stored in Agent Runs and Metrics. Each agent makes one model request per stage preparation. Groq's free tier rate-limits rapid back-to-back requests; preparing several agent-backed stages in quick succession may need light pacing or a higher tier.
 
 ### Amazon Bedrock
 
@@ -164,7 +188,11 @@ The Streamable HTTP endpoint is <http://127.0.0.1:8001/mcp>. It binds to loopbac
 - `list_project_artifacts(project_id)` — artifact names, types, versions, and update times.
 - `read_project_artifact(project_id, artifact_id)` — latest artifact content after checking that the artifact belongs to the supplied project.
 
-These tools cannot edit or delete data, approve workflow stages, create projects, or perform external research. The server is a local development integration; it has no authentication for network exposure. A2A and connections to external MCP servers are not implemented.
+These three tools are implemented in a shared backend tool layer (`app/agents/tools.py`) that the stage agents also use in-process to read prior project context and artifacts. The MCP server wraps that layer over Streamable HTTP for external clients. The tools cannot edit or delete data, approve workflow stages, create projects, or perform external research. The server is a local development integration; it has no authentication for network exposure, so it keeps its single-member access restriction. Connections to external MCP servers are not implemented.
+
+### Agent-to-agent (A2A) messages
+
+Within a single project, agents hand context forward through a persisted message bus (`agent_messages` table). An earlier stage posts a message addressed to a later agent, which consumes it on its next run and folds it into its prompt. The default wiring hands off `market_research → technical_feasibility → architecture_agent`. Handoffs are recorded as project traces and are readable through `GET /projects/{id}/agent-messages`. This bus is internal and in-process; it is not a cross-service or cross-network agent protocol.
 
 ## Configuration reference
 
@@ -179,33 +207,37 @@ Backend variables can be set in `backend/.env` or in the backend process environ
 | `BACKEND_PORT` | Configured backend port | `8000` |
 | `DATABASE_URL` | SQLAlchemy connection URL | `sqlite:///./nexusflow.db` |
 | `CORS_ORIGINS` | JSON list of permitted browser origins | `["http://localhost:3000"]` |
-| `LLM_PROVIDER` | Idea-analysis provider (`mock`, `groq`, `bedrock`) | app fallback `bedrock`; `.env.example` uses `mock` |
+| `LLM_PROVIDER` | Agent provider shared by all stages (`mock`, `groq`, `bedrock`) | app fallback `bedrock`; `.env.example` uses `mock` |
 | `GROQ_API_KEY` | Backend-only Groq credential | empty unless Groq is selected |
 | `GROQ_MODEL` | Groq model identifier | `openai/gpt-oss-120b` |
 | `AWS_REGION` | AWS region for Bedrock | `us-west-2` |
 | `BEDROCK_MODEL_ID` | Bedrock model identifier | `anthropic.claude-3-5-sonnet-20240620-v1:0` |
 | `LLM_TIMEOUT_SECONDS` | Provider request timeout setting | `60` |
+| `AUTH_SECRET_KEY` | JWT signing key; set a stable random value for deployment | random per process if omitted locally |
+| `AUTH_TOKEN_EXPIRE_MINUTES` | Account session lifetime | `720` |
 | `NEXT_PUBLIC_API_URL` | Frontend API base URL | `http://localhost:8000` |
 
 `DATABASE_URL` may be pointed at another SQLAlchemy database, but the project only documents and validates SQLite for local use. Other database engines may require a driver, schema migrations, and deployment-specific configuration.
 
 ## API overview
 
-The complete request and response schemas are available in Swagger UI at <http://localhost:8000/docs>.
+All routes except health, account registration, and login require `Authorization: Bearer <access_token>`. The complete request and response schemas are available in Swagger UI at <http://localhost:8000/docs>.
 
 | Area | Representative routes |
 | --- | --- |
 | Health | `GET /health` |
+| Accounts | `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `POST /auth/invitations/accept` |
 | Projects and brief | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, `POST/GET/PUT /projects/{id}/idea-analysis` |
+| Project team | `GET /projects/{id}/members`, `POST/GET/DELETE /projects/{id}/invitations`, member role/removal and ownership-transfer routes |
 | Workflow | `POST/GET /projects/{id}/workflow`, `POST /projects/{id}/workflow/prepare`, `POST /projects/{id}/workflow/decision`, `GET /review-queue/workflows` |
 | Artifacts and export | `GET/POST /projects/{id}/artifacts`, artifact version routes, `GET /projects/{id}/package/export` |
 | Research | `GET/POST /projects/{id}/research-sources`, source update/delete routes, `POST /projects/{id}/research-plan/refresh` |
 | Review and HITL | project checkpoint routes, `GET /review-queue`, artifact review comment routes |
 | Evaluations and guardrails | consistency and Devil's Advocate evaluation routes; guardrail finding routes |
 | Runs and metrics | `/mlops/runs`, `/mlops/prompts`, `/mlops/cost-summary`, `/mlops/metrics` |
-| Traces and dashboard | project trace routes, `/dashboard/stats`, and `/dashboard/events/{project_id}` |
+| Traces and dashboard | project trace routes, `GET /projects/{id}/agent-messages`, `/dashboard/stats`, and `/dashboard/events/{project_id}` |
 
-Routes generally return JSON. Artifact package and artifact export routes return downloadable files. This API does not authenticate callers or enforce user/project ownership.
+Routes generally return JSON. Artifact package and artifact export routes return downloadable files. Project-level API routes require membership and enforce role permissions.
 
 ## Tests and production build
 
@@ -230,11 +262,13 @@ The backend test command uses a separate SQLite filename so it does not use the 
 
 - Local projects and workflow records are stored in `backend/nexusflow.db` when using the documented quick start. Back up or remove that file to manage local state.
 - `.env`, `.venv`, and local SQLite database files are ignored by Git. `.env.example` contains placeholders, not credentials.
-- There is no authentication, authorization, tenant isolation, or authenticated reviewer identity. Do not put sensitive real-world/customer data into a shared or exposed deployment.
+- Email/password accounts and project roles are implemented, but account verification, password reset, login rate limiting, invitation email delivery, organization management, and production session revocation are not. Do not put sensitive customer data into a shared or exposed deployment.
+- The frontend stores bearer tokens in browser local storage. Use a production identity provider and secure HttpOnly cookie/session design before operating an internet-facing service.
 - Keep the API and MCP server bound to trusted local interfaces. Do not expose port 8000 or 8001 to the public internet.
 - CORS is not authentication. Restricting `CORS_ORIGINS` does not prevent non-browser clients from calling the API.
 - SQLite table creation occurs at app startup; there is no migration history or production backup/restore workflow yet.
 - Groq/AWS credentials belong only in the backend environment. If a credential is accidentally committed or shared, revoke and rotate it.
+- Set a stable high-entropy `AUTH_SECRET_KEY` in each deployment. If omitted, a random process-local key is generated; API restarts invalidate tokens, and multiple workers will not share sessions.
 
 Common local checks:
 
@@ -245,7 +279,7 @@ Common local checks:
 
 ## Roadmap and contributing
 
-Current next steps for making the project safer and more useful include authentication and project authorization, database migrations and backup strategy, CI, end-to-end browser coverage, real source discovery with citations and explicit permission controls, model-aware cost estimates, and a deployment guide. A2A should be considered when independent agents actually need cross-service task handoff.
+Current next steps for making the project safer and more useful include account recovery and verification, secure production sessions, database migrations and backup strategy, CI, end-to-end browser coverage, real source discovery with citations and explicit permission controls, model-aware cost estimates (including Groq), and a deployment guide. The backend test suite currently predates the authentication layer and needs a login fixture to pass; adding that is a near-term cleanup. The in-project A2A bus could grow into cross-service task handoff if independent agents ever need to coordinate across process or network boundaries.
 
 - [Architecture and current capabilities](docs/ARCHITECTURE.md)
 - [Implementation status and follow-up plan](docs/IMPLEMENTATION_PLAN.md)

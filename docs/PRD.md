@@ -30,6 +30,9 @@ The following describe the product direction. Current stage generation is draft-
 ## Functional requirements
 
 - Create, list, retrieve, update, and delete projects
+- Register and sign in; control project access through owner, editor, reviewer, and viewer roles
+- Invite a collaborator by email using a revocable, expiring, single-use link
+- Attribute workflow decisions and review actions to the authenticated account
 - Submit a raw idea and capture clarifying questions
 - Persist project state and resume workflow progress after restart
 - Generate research and specification artifacts per project stage
