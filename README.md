@@ -279,11 +279,12 @@ Common local checks:
 
 ## Roadmap and contributing
 
-Current next steps for making the project safer and more useful include account recovery and verification, secure production sessions, database migrations and backup strategy, CI, end-to-end browser coverage, real source discovery with citations and explicit permission controls, model-aware cost estimates (including Groq), and a deployment guide. The backend test suite currently predates the authentication layer and needs a login fixture to pass; adding that is a near-term cleanup. The in-project A2A bus could grow into cross-service task handoff if independent agents ever need to coordinate across process or network boundaries.
+Current next steps for making the project safer and more useful include account recovery and verification, secure production sessions (replacing local-storage bearer tokens), a tested database backup/restore strategy, real source discovery with citations and explicit permission controls, and model-aware cost estimates (including Groq). Invitation email delivery, cross-process agent-to-agent handoff, GitHub Actions CI, Alembic migrations, an authenticated backend test suite, and a deployment and hardening guide are now in place.
 
 - [Architecture and current capabilities](docs/ARCHITECTURE.md)
 - [Implementation status and follow-up plan](docs/IMPLEMENTATION_PLAN.md)
 - [Product requirements and longer-term direction](docs/PRD.md)
+- [Deployment and hardening guide](docs/DEPLOYMENT.md)
 - [Contributing guide](CONTRIBUTING.md)
 
-There is currently no `LICENSE` file. Choose and add a license before describing this repository as open source or accepting contributions under a particular reuse grant.
+This repository is licensed under the MIT License; see [LICENSE](LICENSE).

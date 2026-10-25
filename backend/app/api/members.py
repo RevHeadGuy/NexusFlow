@@ -7,8 +7,10 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.models.auth import ProjectInvitation, ProjectMembership, User
+from app.models.project import Project
 from app.schemas.auth import InviteCreate, InvitationRead, MemberRead
 from app.services.auth_service import create_invitation
+from app.services.email_service import build_invite_url, send_invitation_email
 
 router = APIRouter(prefix="/projects", tags=["project collaboration"])
 
@@ -48,6 +50,18 @@ def invite_member(project_id: str, payload: InviteCreate, request: Request, db: 
         role=payload.role,
         invited_by_user_id=request.state.user.id,
     )
+
+    # Best-effort email delivery. The invitation is already persisted, so a send
+    # failure must not fail the request — the caller still receives the link.
+    project = db.get(Project, project_id)
+    email_sent = send_invitation_email(
+        to_email=invitation.email,
+        invite_url=build_invite_url(raw_token),
+        project_name=project.name if project else "a NexusFlow project",
+        role=invitation.role,
+        inviter_name=request.state.user.display_name,
+    )
+
     return InvitationRead(
         id=invitation.id,
         project_id=invitation.project_id,
@@ -55,6 +69,7 @@ def invite_member(project_id: str, payload: InviteCreate, request: Request, db: 
         role=invitation.role,
         expires_at=invitation.expires_at,
         invite_token=raw_token,
+        email_sent=email_sent,
     )
 
 

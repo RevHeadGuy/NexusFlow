@@ -30,3 +30,13 @@ class AgentMessageRead(BaseModel):
     status: str
     in_reply_to: str | None = None
     created_at: datetime
+
+
+class AgentMessageCreate(BaseModel):
+    """An A2A message delivered into a project from an external agent/process."""
+
+    sender: str = Field(..., min_length=1, max_length=80)
+    recipient: str = Field(..., min_length=1, max_length=80)
+    content: str = Field(..., min_length=1, max_length=20000)
+    message_type: str = Field(default="context", pattern="^(request|context|response|handoff)$")
+    in_reply_to: str | None = Field(default=None, max_length=36)

@@ -10,7 +10,7 @@ import { useAuth } from "@/app/providers";
 
 type Role = "owner" | "editor" | "reviewer" | "viewer";
 interface Member { user_id: string; email: string; display_name: string; role: Role; created_at: string }
-interface Invitation { id: string; project_id: string; email: string; role: Role; expires_at: string; invite_token?: string | null }
+interface Invitation { id: string; project_id: string; email: string; role: Role; expires_at: string; invite_token?: string | null; email_sent?: boolean }
 const roles: Role[] = ["editor", "reviewer", "viewer"];
 
 export default function ProjectTeamPage() {
@@ -21,6 +21,7 @@ export default function ProjectTeamPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("reviewer");
   const [inviteUrl, setInviteUrl] = useState("");
+  const [emailSent, setEmailSent] = useState(false);
   const [error, setError] = useState("");
   const key = ["project-members", projectId];
   const members = useQuery({ queryKey: key, queryFn: () => api.get<Member[]>(`/projects/${projectId}/members`) });
@@ -32,6 +33,7 @@ export default function ProjectTeamPage() {
     onSuccess: (result) => {
       const url = `${window.location.origin}/invite?token=${encodeURIComponent(result.invite_token ?? "")}`;
       setInviteUrl(url);
+      setEmailSent(result.email_sent ?? false);
       setEmail("");
       queryClient.invalidateQueries({ queryKey: ["project-invitations", projectId] });
     },
@@ -59,6 +61,7 @@ export default function ProjectTeamPage() {
     event.preventDefault();
     setError("");
     setInviteUrl("");
+    setEmailSent(false);
     invite.mutate();
   }
 
@@ -80,9 +83,9 @@ export default function ProjectTeamPage() {
           <label className="text-xs text-[var(--text-secondary)]">Project role<select value={role} onChange={(event) => setRole(event.target.value as Role)} className="mt-1.5 h-10 w-full rounded-lg border border-white/[0.09] bg-[#101018] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-indigo-400">{roles.map((item) => <option key={item} value={item}>{item[0].toUpperCase() + item.slice(1)}</option>)}</select></label>
           <button disabled={invite.isPending} className="mt-auto inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-500 px-4 text-sm font-semibold text-white hover:bg-indigo-400 disabled:opacity-60">{invite.isPending ? "Creating…" : "Create invite"}</button>
         </form>
-        <p className="mt-3 text-[11px] leading-5 text-[var(--text-muted)]">NexusFlow creates a single-use, seven-day invite link. Copy and send it to the teammate; email delivery is not configured.</p>
+        <p className="mt-3 text-[11px] leading-5 text-[var(--text-muted)]">NexusFlow creates a single-use, seven-day invite link. If email delivery is configured the link is emailed automatically; otherwise copy and send it to the teammate.</p>
         {error && <p role="alert" className="mt-3 rounded-lg border border-rose-400/20 bg-rose-400/10 p-3 text-xs text-rose-200">{error}</p>}
-        {inviteUrl && <div className="mt-4 rounded-lg border border-emerald-400/20 bg-emerald-400/[0.06] p-4"><p className="text-xs font-medium text-emerald-200">Invitation created · copy this link now</p><div className="mt-2 flex flex-col gap-2 sm:flex-row"><input readOnly value={inviteUrl} aria-label="Invitation link" className="h-10 min-w-0 flex-1 rounded-md border border-white/10 bg-black/20 px-3 text-xs text-slate-200" /><button type="button" onClick={copyInvite} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-white/10 px-3 text-xs text-slate-200 hover:bg-white/5"><Copy className="h-3.5 w-3.5" />Copy link</button></div></div>}
+        {inviteUrl && <div className="mt-4 rounded-lg border border-emerald-400/20 bg-emerald-400/[0.06] p-4"><p className="text-xs font-medium text-emerald-200">{emailSent ? "Invitation created and emailed · link also shown below" : "Invitation created · copy this link now"}</p><div className="mt-2 flex flex-col gap-2 sm:flex-row"><input readOnly value={inviteUrl} aria-label="Invitation link" className="h-10 min-w-0 flex-1 rounded-md border border-white/10 bg-black/20 px-3 text-xs text-slate-200" /><button type="button" onClick={copyInvite} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-white/10 px-3 text-xs text-slate-200 hover:bg-white/5"><Copy className="h-3.5 w-3.5" />Copy link</button></div></div>}
       </Card>}
 
       <Card className="overflow-hidden">
