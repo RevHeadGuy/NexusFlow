@@ -83,3 +83,6 @@ class InvitationRead(BaseModel):
     role: str
     expires_at: datetime
     invite_token: str | None = None
+    # True when an invitation email was actually sent (email delivery enabled
+    # and SMTP reachable). False means the inviter should share the link manually.
+    email_sent: bool = False
