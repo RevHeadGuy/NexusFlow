@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+# Ensure the backend package root is importable (`import app...`) no matter
+# where pytest is invoked from, and keep test discovery scoped to tests/.
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"

@@ -338,14 +338,15 @@ class TestHITLCheckpoints:
             json={
                 "action": "approve",
                 "reviewer_notes": "Output looks correct.",
-                "reviewed_by": "reviewer@nexusflow.ai",
             },
         )
         assert review_resp.status_code == 200, review_resp.text
         data = review_resp.json()
         assert data["status"] == "approved"
         assert data["reviewed_at"] is not None
-        assert data["reviewed_by"] == "reviewer@nexusflow.ai"
+        # Review actions are attributed to the authenticated account, not a
+        # client-supplied field. The test fixture registers "Test User".
+        assert data["reviewed_by"] == "Test User"
 
     def test_approve_with_edits(self):
         project_id = _create_project("HITL Edit Test")
