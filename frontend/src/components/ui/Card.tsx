@@ -1,8 +1,22 @@
 import { cn } from "@/lib/utils";
 
-export function Card({ className, children }: { className?: string; children: React.ReactNode }) {
+export function Card({
+  className,
+  children,
+  interactive,
+}: {
+  className?: string;
+  children: React.ReactNode;
+  interactive?: boolean;
+}) {
   return (
-    <div className={cn("rounded-xl surface overflow-hidden", className)}>
+    <div
+      className={cn(
+        "rounded-xl overflow-hidden",
+        interactive ? "surface-interactive" : "surface",
+        className
+      )}
+    >
       {children}
     </div>
   );

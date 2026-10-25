@@ -61,13 +61,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Lint is reported but not fatal while pre-existing
-      # react-hooks/set-state-in-effect findings (from a newer
-      # eslint-config-next) are still being cleaned up. Drop `continue-on-error`
-      # to make lint blocking once the frontend is clean.
       - name: Lint
         run: npm run lint
-        continue-on-error: true
 
       - name: Type check
         run: npx tsc --noEmit

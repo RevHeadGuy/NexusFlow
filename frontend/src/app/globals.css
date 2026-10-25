@@ -33,6 +33,13 @@
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Ambient depth: soft colored glows anchored to the corners */
+    background-image:
+      radial-gradient(900px circle at 0% 0%, rgba(99, 102, 241, 0.08), transparent 45%),
+      radial-gradient(1000px circle at 100% 0%, rgba(168, 85, 247, 0.07), transparent 45%),
+      radial-gradient(800px circle at 50% 100%, rgba(20, 184, 166, 0.05), transparent 50%);
+    background-attachment: fixed;
+    text-rendering: optimizeLegibility;
   }
 
   /* Scrollbar */
@@ -106,6 +113,31 @@
     );
     background-size: 200% 100%;
     animation: shimmer 2s infinite;
+  }
+
+  /* Hairline gradient border used to separate sections */
+  .hairline {
+    background: linear-gradient(90deg, transparent, var(--border-bright), transparent);
+    height: 1px;
+  }
+
+  /* Interactive surface that lifts on hover */
+  .surface-interactive {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .surface-interactive:hover {
+    border-color: var(--border-bright);
+    box-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.6);
+    transform: translateY(-2px);
+  }
+
+  /* Card entrance stagger helper (used with inline --i var) */
+  .stagger-item {
+    opacity: 0;
+    animation: fadeInUp 0.45s ease forwards;
+    animation-delay: calc(var(--i, 0) * 50ms);
   }
 }
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Brain, FileText, FlaskConical, GitBranch, ListChecks, Radio, Search } from "lucide-react";
+import { Brain, FileText, FlaskConical, GitBranch, ListChecks, Radio, Search, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -13,6 +13,7 @@ const TABS = [
   { label: "Evaluations", suffix: "/evaluations", icon: FlaskConical },
   { label: "Checkpoints", suffix: "/checkpoints", icon: ListChecks },
   { label: "Traces",      suffix: "/traces",      icon: Radio },
+  { label: "Team",        suffix: "/team",        icon: Users },
 ];
 
 export function ProjectTabs({ projectId }: { projectId: string }) {

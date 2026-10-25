@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -18,18 +18,23 @@ export function ArtifactViewer({ artifact, versions }: { artifact: Artifact; ver
   const [draftContent, setDraftContent] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Reset view/edit state when switching to a different artifact. Adjusting
+  // state during render (the React-recommended pattern) avoids the cascading
+  // render that an effect-based reset triggers.
+  const [lastArtifactId, setLastArtifactId] = useState(artifact.id);
   const queryClient = useQueryClient();
+
+  if (artifact.id !== lastArtifactId) {
+    setLastArtifactId(artifact.id);
+    setSelectedVersion(null);
+    setEditing(false);
+    setSaveError(null);
+  }
 
   const current = selectedVersion ?? versions.find((v) => v.version === artifact.current_version) ?? versions[0];
   const content = current?.content ?? artifact.content;
   const isLatestVersion = current?.version === artifact.current_version;
   const exportUrl = artifactsApi.exportUrl(artifact.project_id, artifact.id);
-
-  useEffect(() => {
-    setSelectedVersion(null);
-    setEditing(false);
-    setSaveError(null);
-  }, [artifact.id]);
 
   async function saveDraft() {
     if (draftContent === content || saving) return;

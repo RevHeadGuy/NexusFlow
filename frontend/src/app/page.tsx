@@ -10,15 +10,18 @@ import { Button } from "@/components/ui/Button";
 import { STATUS_STYLES, cn, formatRelative, WORKFLOW_STAGES } from "@/lib/utils";
 
 function StatCard({
-  label, value, sub, icon: Icon, accent,
+  label, value, sub, icon: Icon, accent, index = 0,
 }: {
   label: string; value: string | number; sub?: string;
-  icon: React.ElementType; accent: string;
+  icon: React.ElementType; accent: string; index?: number;
 }) {
   return (
-    <div className={cn(
-      "relative rounded-xl p-5 overflow-hidden surface transition-all duration-200 hover:border-white/[0.12] group"
-    )}>
+    <div
+      className={cn(
+        "stagger-item surface-interactive relative rounded-xl p-5 overflow-hidden group"
+      )}
+      style={{ "--i": index } as React.CSSProperties}
+    >
       {/* Glow accent */}
       <div className={cn(
         "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300",
@@ -106,12 +109,12 @@ export default function DashboardPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Total Projects"   value={stats.total_projects}       icon={Layers}        accent="blue" />
-        <StatCard label="Pending Reviews"  value={stats.pending_checkpoints}  icon={Clock}         accent="amber"
+        <StatCard label="Total Projects"   value={stats.total_projects}       icon={Layers}        accent="blue"  index={0} />
+        <StatCard label="Pending Reviews"  value={stats.pending_checkpoints}  icon={Clock}         accent="amber" index={1}
           sub={stats.pending_checkpoints === 0 ? "All clear" : "Awaiting review"} />
-        <StatCard label="Active Violations" value={stats.blocking_violations} icon={AlertTriangle}  accent="red"
+        <StatCard label="Active Violations" value={stats.blocking_violations} icon={AlertTriangle}  accent="red"  index={2}
           sub={stats.blocking_violations === 0 ? "No blockers" : "Need override"} />
-        <StatCard label="Completed"        value={stats.projects_by_status?.completed ?? 0} icon={CheckCircle} accent="green" />
+        <StatCard label="Completed"        value={stats.projects_by_status?.completed ?? 0} icon={CheckCircle} accent="green" index={3} />
       </div>
 
       {stats.total_projects === 0 && (

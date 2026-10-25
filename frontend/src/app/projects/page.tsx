@@ -60,8 +60,8 @@ export default function ProjectsPage() {
           {projects.map((project, i) => (
             <div
               key={project.id}
-              className="group relative rounded-xl surface hover:border-white/[0.12] transition-all duration-200 hover:shadow-xl hover:shadow-black/20 overflow-hidden"
-              style={{ animationDelay: `${i * 40}ms` }}
+              className="group stagger-item surface-interactive relative rounded-xl overflow-hidden"
+              style={{ "--i": i } as React.CSSProperties}
             >
               {/* Top accent line */}
               <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />

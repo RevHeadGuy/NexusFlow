@@ -43,7 +43,7 @@ python -m app.mcp_server`}</pre>
               <p className="mt-1 break-words text-xs text-[var(--text-primary)]">Streamable HTTP · loopback only</p>
             </div>
           </div>
-          <p className="flex items-start gap-2 text-xs text-[var(--text-muted)]"><ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />The server binds to this computer only. MCP clients must run on the same machine. Requests include project IDs; artifact reads are checked against the selected project.</p>
+          <p className="flex items-start gap-2 text-xs text-[var(--text-muted)]"><ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />Loopback only. MCP has no per-user identity, so NexusFlow disables it after a second account is registered to prevent cross-account access.</p>
         </CardContent>
       </Card>
 

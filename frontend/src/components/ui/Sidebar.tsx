@@ -12,6 +12,7 @@ import {
   FlaskConical,
   FolderKanban,
   LayoutDashboard,
+  LogOut,
   Menu,
   Sparkles,
   X,
@@ -19,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api/client";
+import { useAuth } from "@/app/providers";
 
 const GROUPS = [
   {
@@ -117,8 +119,14 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 function SidebarFooter() {
+  const { user, logout } = useAuth();
   return (
     <div className="space-y-3 border-t border-white/[0.06] px-5 py-4">
+      {user && <div className="flex items-center gap-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-500/15 text-xs font-semibold text-indigo-200">{user.display_name.slice(0, 1).toUpperCase()}</div>
+        <div className="min-w-0 flex-1"><p className="truncate text-xs font-medium text-[var(--text-primary)]">{user.display_name}</p><p className="truncate text-[10px] text-[var(--text-muted)]">{user.email}</p></div>
+        <button type="button" onClick={logout} aria-label="Sign out" title="Sign out" className="rounded-md p-2 text-[var(--text-muted)] hover:bg-white/[0.05] hover:text-white"><LogOut className="h-4 w-4" /></button>
+      </div>}
       <ApiStatus />
       <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
         <Activity className="h-3 w-3" /> NexusFlow API · v0.2.0

@@ -176,6 +176,7 @@ export default function WorkflowPage() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium capitalize text-[var(--text-primary)]">{d.action}</span>
                         <span className="text-xs text-[var(--text-muted)] capitalize">{d.stage.replace(/_/g, " ")}</span>
+                        {d.reviewer_name && <span className="text-[10px] text-indigo-300">by {d.reviewer_name}</span>}
                       </div>
                       {d.notes && <p className="text-xs text-[var(--text-muted)] mt-0.5 italic">{d.notes}</p>}
                     </div>
