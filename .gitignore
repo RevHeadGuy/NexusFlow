@@ -26,6 +26,11 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# The Python `lib/` rule above unintentionally matches the frontend source
+# directory `frontend/src/lib/`. Keep that application code tracked.
+!frontend/src/lib/
+!frontend/src/lib/**
+
 # PyInstaller
 #   Usually these files are written by a python script from a template
 #   before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -223,3 +228,6 @@ __marimo__/
 *.db
 *.db-journal
 *.tsbuildinfo
+
+# macOS
+.DS_Store
