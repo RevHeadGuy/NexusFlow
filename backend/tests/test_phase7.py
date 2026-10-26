@@ -113,3 +113,57 @@ def test_external_agent_message_rejects_invalid_type():
         },
     )
     assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Cost estimation — Groq is now priced alongside Bedrock
+# ---------------------------------------------------------------------------
+
+
+def _run(model_id: str, input_tokens: int, output_tokens: int):
+    from app.models.mlops import AgentRun
+
+    return AgentRun(
+        project_id="p",
+        stage="s",
+        agent_name="a",
+        model_id=model_id,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+    )
+
+
+def test_groq_cost_is_estimated():
+    from app.services.mlops_service import cost_for_run
+
+    # 1M input + 1M output of gpt-oss-120b at $0.15 / $0.60 per 1M = $0.75.
+    cost = cost_for_run(_run("groq/openai/gpt-oss-120b", 1_000_000, 1_000_000))
+    assert cost == 0.75
+
+
+def test_groq_20b_cost_is_estimated():
+    from app.services.mlops_service import cost_for_run
+
+    # gpt-oss-20b at $0.10 / $0.50 per 1M.
+    cost = cost_for_run(_run("groq/openai/gpt-oss-20b", 1_000_000, 1_000_000))
+    assert cost == 0.60
+
+
+def test_unknown_groq_model_uses_default_rate():
+    from app.services.mlops_service import cost_for_run
+
+    cost = cost_for_run(_run("groq/some-future-model", 1_000_000, 0))
+    assert cost == 0.15  # default input rate
+
+
+def test_bedrock_cost_still_estimated():
+    from app.services.mlops_service import cost_for_run
+
+    cost = cost_for_run(_run("anthropic.claude-3-5-sonnet-20240620-v1:0", 1_000_000, 0))
+    assert cost == 3.00  # Claude 3.5 Sonnet input rate
+
+
+def test_mock_model_has_no_cost():
+    from app.services.mlops_service import cost_for_run
+
+    assert cost_for_run(_run("mock", 1_000_000, 1_000_000)) is None

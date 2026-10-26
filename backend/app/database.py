@@ -1,3 +1,5 @@
+import logging
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -22,5 +24,21 @@ def get_db():
         database.close()
 
 
+logger = logging.getLogger(__name__)
+
+
 def init_db() -> None:
-    Base.metadata.create_all(bind=engine)
+    """Create tables automatically for local SQLite only.
+
+    For any other engine (e.g. PostgreSQL in a shared/managed deployment),
+    Alembic migrations are the source of truth — run ``alembic upgrade head``
+    instead of relying on startup table creation. Auto-creating on a managed
+    database would bypass migration history and risk schema drift.
+    """
+    if settings.database_url.startswith("sqlite"):
+        Base.metadata.create_all(bind=engine)
+    else:
+        logger.info(
+            "Skipping automatic table creation for non-SQLite database; "
+            "apply schema with `alembic upgrade head`."
+        )

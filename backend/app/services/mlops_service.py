@@ -294,17 +294,41 @@ def activate_prompt_version(db: Session, agent_name: str, version: int) -> Promp
 # Cost and aggregate metrics
 # ---------------------------------------------------------------------------
 
-# Approximate pricing per 1M tokens (USD) — update as needed
-_INPUT_COST_PER_1M = 3.00   # Claude 3.5 Sonnet input
-_OUTPUT_COST_PER_1M = 15.00  # Claude 3.5 Sonnet output
+# Approximate pricing per 1M tokens (USD) as (input, output). Update as rates
+# change. The mock provider has no cost. Bedrock uses the default Claude 3.5
+# Sonnet rate; Groq rates come from Groq's published model pricing.
+_BEDROCK_DEFAULT_RATE = (3.00, 15.00)  # Claude 3.5 Sonnet input/output
+
+# Keyed by the Groq model id that appears after the "groq/" prefix in model_id.
+_GROQ_RATES: dict[str, tuple[float, float]] = {
+    "openai/gpt-oss-120b": (0.15, 0.60),
+    "openai/gpt-oss-20b": (0.10, 0.50),
+}
+# Fallback for an unrecognised Groq model: use the 120B rate rather than leaving
+# cost blank, so the summary still reflects spend. Adjust if you pin a model
+# with materially different pricing.
+_GROQ_DEFAULT_RATE = (0.15, 0.60)
+
+
+def _rate_for_model(model_id: str) -> tuple[float, float] | None:
+    """Return (input, output) per-1M-token USD rates for a run's model, or None."""
+    if model_id == "mock" or not model_id:
+        return None
+    if model_id.startswith("groq/"):
+        groq_model = model_id[len("groq/"):]
+        return _GROQ_RATES.get(groq_model, _GROQ_DEFAULT_RATE)
+    # Bedrock (and any other non-mock provider recorded by model id).
+    return _BEDROCK_DEFAULT_RATE
 
 
 def cost_for_run(run: AgentRun) -> float | None:
-    """Return the Bedrock estimate when its pricing applies; other providers are unpriced."""
-    if run.model_id.startswith("groq/") or run.model_id == "mock":
+    """Estimate a run's cost in USD, or None when the model has no known price."""
+    rate = _rate_for_model(run.model_id)
+    if rate is None:
         return None
-    input_cost = ((run.input_tokens or 0) / 1_000_000) * _INPUT_COST_PER_1M
-    output_cost = ((run.output_tokens or 0) / 1_000_000) * _OUTPUT_COST_PER_1M
+    input_rate, output_rate = rate
+    input_cost = ((run.input_tokens or 0) / 1_000_000) * input_rate
+    output_cost = ((run.output_tokens or 0) / 1_000_000) * output_rate
     return round(input_cost + output_cost, 6)
 
 
