@@ -24,10 +24,10 @@ This repository has a local full-stack prototype: project CRUD, an editable stru
 - An orchestrator that runs each agent through one lifecycle (run tracking, guardrails, tool reads, A2A handoff, tracing)
 - Modular services for projects, workflow, artifacts, evaluations, approval logic, and the A2A message bus
 
-### Supporting Services
-- Redis optional for caching/job coordination
-- Docker Compose for local stack
-- OpenTelemetry-compatible tracing and structured logging
+### Supporting Services (status)
+- OpenTelemetry API/SDK are installed dependencies; in-app project traces are persisted and viewable, but a full distributed-tracing pipeline is not wired up
+- Redis (caching/job coordination) and Docker Compose (local stack) are planned, not present in the repository today
+- Alembic migrations are in place (`backend/migrations/`); SQLite table creation also runs at startup for local development
 
 ## Phase roadmap
 
@@ -116,8 +116,9 @@ Acceptance criteria:
 - [x] Deterministic evaluations produce review findings
 - [x] MCP exposes read-only project and artifact tools
 - [x] Project artifact ZIP package is generated deterministically
-- [ ] Backend test suite updated with an auth fixture so pre-auth phase tests pass
-- [ ] Frontend and backend pass CI checks
+- [x] Backend test suite updated with a session-scoped auth fixture (`tests/conftest.py`) so phase tests pass under the authentication layer
+- [x] Frontend and backend pass CI checks (GitHub Actions workflow in `.github/workflows/ci.yml`)
+- [x] Alembic migrations added for the initial schema
 
 ## Risk Notes
 
