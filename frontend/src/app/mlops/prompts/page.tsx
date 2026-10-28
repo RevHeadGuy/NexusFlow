@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { FlaskConical } from "lucide-react";
 import { formatDate, cn } from "@/lib/utils";
 
-const AGENTS = ["idea_analyst","market_research","technical_feasibility","prd_generator","architecture_agent","ux_spec_agent","quality_evaluator"];
+const AGENTS = ["idea_analyst","market_research","technical_feasibility","prd_generator","architecture_agent","quality_evaluator"];
 const inputCls = "w-full rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all";
 
 function AgentPrompts({ agentName }: { agentName: string }) {

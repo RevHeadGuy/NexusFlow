@@ -17,7 +17,6 @@ LENGTH_LIMITS: dict[str, tuple[int, int]] = {
     "technical_feasibility": (100,  5_000),
     "prd_generator":         (200, 15_000),
     "architecture_agent":    (150, 10_000),
-    "ux_spec_agent":         (100,  8_000),
     "quality_evaluator":     (50,   5_000),
 }
 

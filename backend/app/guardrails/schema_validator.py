@@ -32,10 +32,6 @@ AGENT_SCHEMAS: dict[str, tuple[list[str], list[str]]] = {
         ["components", "data_flow", "tech_stack", "infrastructure"],
         ["components", "tech_stack"],
     ),
-    "ux_spec_agent": (
-        ["user_flows", "screens", "interaction_patterns"],
-        ["user_flows", "screens"],
-    ),
     "quality_evaluator": (
         ["findings", "summary", "overall_score"],
         ["findings"],

@@ -69,7 +69,9 @@ NexusFlow is a local-first project planning prototype. It guides a user from a s
 
 ## Project lifecycle
 
-IDEA SUBMITTED -> IDEA DISCOVERY -> HUMAN APPROVAL -> RESEARCH -> FEASIBILITY -> HUMAN APPROVAL -> PRD/ARCHITECTURE/UX/PLANNING -> CONSISTENCY CHECK -> ADVERSARIAL REVIEW -> QUALITY EVALUATION -> REVISION LOOP -> FINAL APPROVAL -> PACKAGE EXPORT
+IDEA SUBMITTED -> IDEA DISCOVERY -> HUMAN APPROVAL -> MARKET RESEARCH -> TECHNICAL FEASIBILITY -> HUMAN APPROVAL -> PRD + ARCHITECTURE -> CONSISTENCY CHECK -> ADVERSARIAL REVIEW -> QUALITY EVALUATION -> REVISION LOOP -> FINAL APPROVAL -> PACKAGE EXPORT
+
+The stage keys enforced by the backend are `idea_discovery`, `market_research`, `technical_feasibility`, `prd_architecture`, `quality_review`, and `final_approval`. Six specialized agents back these stages (idea analysis, market research, technical feasibility, PRD, architecture, and quality evaluation); there is no separate UX specification agent or stage.
 
 ## Key non-functional requirements
 
@@ -81,4 +83,4 @@ IDEA SUBMITTED -> IDEA DISCOVERY -> HUMAN APPROVAL -> RESEARCH -> FEASIBILITY ->
 
 ## Current implementation status
 
-The repository is a local prototype with a FastAPI REST API, Next.js workspace, SQLite development persistence, email/password accounts, project memberships and roles, signed API tokens, persisted workflow templates and decisions, a multi-agent stage-generation pipeline with a shared provider abstraction and orchestration lifecycle, an in-process project tool layer shared with the MCP server, an in-project agent-to-agent message bus, editable versioned artifacts, project briefs, user-curated research sources, review comments, deterministic evaluation reports plus a model-based quality agent, and a local read-only MCP server. It does not include automated external research, account recovery or verification, production migrations, cross-service A2A, or a deployed, hardened orchestration service. The MCP server is a local read-only integration, not a public hosted service. The backend test suite currently predates the authentication layer and needs a login fixture to pass. See `IMPLEMENTATION_PLAN.md` for current boundaries and follow-up work.
+The repository is a local prototype with a FastAPI REST API, Next.js workspace, SQLite development persistence, email/password accounts, project memberships and roles, signed API tokens, persisted workflow templates and decisions, a multi-agent stage-generation pipeline with a shared provider abstraction and orchestration lifecycle, an in-process project tool layer shared with the MCP server, an in-project agent-to-agent message bus, editable versioned artifacts, project briefs, user-curated research sources, review comments, deterministic evaluation reports plus a model-based quality agent, and a local read-only MCP server. It does not include automated external research, account recovery or verification, cross-service A2A, or a deployed, hardened orchestration service. The MCP server is a local read-only integration, not a public hosted service. The backend test suite runs under the authentication layer via a session-scoped login fixture (`backend/tests/conftest.py`) and passes on the mock provider; Alembic migrations and GitHub Actions CI are in place. See `IMPLEMENTATION_PLAN.md` for current boundaries and follow-up work.

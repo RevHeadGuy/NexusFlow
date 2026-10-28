@@ -6,8 +6,8 @@ import { useCostSummary, useMetrics } from "@/lib/hooks/useMlops";
 import { Card, CardContent } from "@/components/ui/Card";
 import { BarChart2 } from "lucide-react";
 
-const AGENTS = ["idea_analyst","market_research","technical_feasibility","prd_generator","architecture_agent","ux_spec_agent","quality_evaluator"];
-const COLORS = ["#6366f1","#a855f7","#14b8a6","#f59e0b","#ef4444","#22c55e","#06b6d4"];
+const AGENTS = ["idea_analyst","market_research","technical_feasibility","prd_generator","architecture_agent","quality_evaluator"];
+const COLORS = ["#6366f1","#a855f7","#14b8a6","#f59e0b","#ef4444","#22c55e"];
 
 const selectCls = "rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-1.5 text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all";
 
