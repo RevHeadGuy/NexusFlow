@@ -104,9 +104,9 @@ export default function ArtifactsPage() {
           <Link href={`/projects/${id}/workflow`}><Button size="sm" variant="secondary">Open workflow</Button></Link>
         </div>
       ) : (
-        <div className="flex min-h-[360px] h-[calc(100dvh-300px)] flex-col gap-4 md:flex-row">
-          {/* List */}
-          <div className="flex max-h-28 w-full shrink-0 gap-1 overflow-x-auto md:max-h-none md:w-52 md:flex-col md:overflow-x-hidden md:overflow-y-auto">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start">
+          {/* List — sticky on desktop so it stays visible while the page scrolls */}
+          <div className="flex max-h-28 w-full shrink-0 gap-1 overflow-x-auto md:sticky md:top-4 md:max-h-[calc(100dvh-8rem)] md:w-52 md:flex-col md:overflow-x-hidden md:overflow-y-auto">
             {artifacts.map((a) => {
               const isActive = (selectedId ?? artifacts[0]?.id) === a.id;
               return (

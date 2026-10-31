@@ -61,7 +61,7 @@ export function ArtifactViewer({ artifact, versions }: { artifact: Artifact; ver
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col space-y-3 overflow-y-auto">
+    <div className="flex flex-col gap-3">
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3">
         {/* Version picker */}
@@ -115,7 +115,7 @@ export function ArtifactViewer({ artifact, versions }: { artifact: Artifact; ver
       </div>
 
       {/* Content */}
-      <div className="min-h-[320px] flex-1 rounded-xl border border-white/[0.06] bg-[var(--bg-surface)] overflow-y-auto">
+      <div className="min-h-[320px] rounded-xl border border-white/[0.06] bg-[var(--bg-surface)]">
         {editing ? (
           <div className="flex h-full min-h-80 flex-col gap-3 p-4 sm:p-6">
             <label htmlFor="artifact-draft-editor" className="text-xs font-medium text-[var(--text-secondary)]">
